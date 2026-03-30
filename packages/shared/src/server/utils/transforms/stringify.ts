@@ -9,7 +9,8 @@ export const stringify = (data: any, key?: string): string => {
     data,
     (k, value) => {
       if (typeof value === "bigint") return Number.parseInt(value.toString());
-      if (typeof value === "string") return decodeUnicodeEscapesOnly(value);
+      if (typeof value === "string")
+        return decodeUnicodeEscapesOnly(value, true);
       return value;
     },
     indent,
@@ -22,6 +23,6 @@ export const stringify = (data: any, key?: string): string => {
  * are passed through JSON.stringify and then CSV-escaped.
  */
 export const stringifyForCsv = (data: any, key?: string): string => {
-  if (typeof data === "string") return decodeUnicodeEscapesOnly(data);
+  if (typeof data === "string") return decodeUnicodeEscapesOnly(data, true);
   return stringify(data, key);
 };
