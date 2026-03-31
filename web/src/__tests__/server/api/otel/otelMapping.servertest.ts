@@ -2047,7 +2047,7 @@ describe("OTel Resource Span Mapping", () => {
 
     it("should remap pydantic-ai function_tools into input and extract tool calls from pydantic parts", async () => {
       const traceId = "deadc0dedeadc0dedeadc0dedeadc0de";
-      const toolCallId = "call_create_location_segment_001";
+      const toolCallId = "call_get_weather_001";
 
       const pydanticAiSpan = {
         resource: {
@@ -2116,8 +2116,7 @@ describe("OTel Resource Span Mapping", () => {
                           parts: [
                             {
                               type: "text",
-                              content:
-                                "Create an audience segment near my Lyon store.",
+                              content: "What is the weather in Example City?",
                             },
                           ],
                         },
@@ -2134,19 +2133,10 @@ describe("OTel Resource Span Mapping", () => {
                             {
                               type: "tool_call",
                               id: toolCallId,
-                              name: "create_location_segment",
+                              name: "get_weather",
                               arguments: {
-                                recommended_location_segment: {
-                                  pointsOfInterest: [
-                                    {
-                                      name: "Lyon Store",
-                                      latitude: 45.764,
-                                      longitude: 4.8357,
-                                    },
-                                  ],
-                                  radiusInKm: 15,
-                                },
-                                segment_name: "Location - Lyon Store - 15km",
+                                location: "Example City",
+                                unit: "celsius",
                               },
                             },
                           ],
@@ -2162,15 +2152,19 @@ describe("OTel Resource Span Mapping", () => {
                         temperature: 0,
                         function_tools: [
                           {
-                            name: "create_location_segment",
+                            name: "get_weather",
                             description:
-                              "Creates a location segment for a point of interest.",
+                              "Retrieves the current weather for a location.",
                             parameters_json_schema: {
                               type: "object",
                               properties: {
-                                segment_name: { type: "string" },
+                                location: { type: "string" },
+                                unit: {
+                                  type: "string",
+                                  enum: ["celsius", "fahrenheit"],
+                                },
                               },
-                              required: ["segment_name"],
+                              required: ["location"],
                             },
                           },
                         ],
@@ -2206,24 +2200,26 @@ describe("OTel Resource Span Mapping", () => {
       expect(parsedInput.messages).toHaveLength(2);
       expect(parsedInput.tools).toEqual([
         {
-          name: "create_location_segment",
-          description: "Creates a location segment for a point of interest.",
+          name: "get_weather",
+          description: "Retrieves the current weather for a location.",
           parameters_json_schema: {
             type: "object",
             properties: {
-              segment_name: { type: "string" },
+              location: { type: "string" },
+              unit: {
+                type: "string",
+                enum: ["celsius", "fahrenheit"],
+              },
             },
-            required: ["segment_name"],
+            required: ["location"],
           },
         },
       ]);
 
       expect(observationEvent?.body.toolDefinitions).toHaveProperty(
-        "create_location_segment",
+        "get_weather",
       );
-      expect(observationEvent?.body.toolCallNames).toEqual([
-        "create_location_segment",
-      ]);
+      expect(observationEvent?.body.toolCallNames).toEqual(["get_weather"]);
       expect(observationEvent?.body.toolCalls).toHaveLength(1);
 
       const parsedToolCall = JSON.parse(observationEvent!.body.toolCalls[0]);
@@ -2232,17 +2228,8 @@ describe("OTel Resource Span Mapping", () => {
         type: "function",
       });
       expect(JSON.parse(parsedToolCall.arguments)).toEqual({
-        recommended_location_segment: {
-          pointsOfInterest: [
-            {
-              name: "Lyon Store",
-              latitude: 45.764,
-              longitude: 4.8357,
-            },
-          ],
-          radiusInKm: 15,
-        },
-        segment_name: "Location - Lyon Store - 15km",
+        location: "Example City",
+        unit: "celsius",
       });
     });
 
