@@ -11,6 +11,8 @@ updates:
     open-pull-requests-limit: 10
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 8
     versioning-strategy: "increase"
     commit-message:
       prefix: chore

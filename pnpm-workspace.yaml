@@ -4,6 +4,8 @@ packages:
   - "worker"
   - "packages/**"
   - "ee"
+# 8 day delay for new dep upgrades to reduce supply chain attack risk
+minimumReleaseAge: 11520
 allowBuilds:
   "@prisma/client": true
   "@prisma/engines": true
