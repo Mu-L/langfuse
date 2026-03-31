@@ -2045,6 +2045,207 @@ describe("OTel Resource Span Mapping", () => {
       expect(metadataAttributes).not.toHaveProperty("final_result");
     });
 
+    it("should remap pydantic-ai function_tools into input and extract tool calls from pydantic parts", async () => {
+      const traceId = "deadc0dedeadc0dedeadc0dedeadc0de";
+      const toolCallId = "call_create_location_segment_001";
+
+      const pydanticAiSpan = {
+        resource: {
+          attributes: [
+            {
+              key: "telemetry.sdk.language",
+              value: { stringValue: "python" },
+            },
+            {
+              key: "telemetry.sdk.name",
+              value: { stringValue: "opentelemetry" },
+            },
+            {
+              key: "service.name",
+              value: { stringValue: "test-service" },
+            },
+          ],
+        },
+        scopeSpans: [
+          {
+            scope: {
+              name: "pydantic-ai",
+              version: "1.66.0",
+              attributes: [],
+            },
+            spans: [
+              {
+                traceId: Buffer.from(traceId, "hex"),
+                spanId: Buffer.from("1234567890abcdef", "hex"),
+                name: "pydantic-ai-tool-generation",
+                kind: 1,
+                startTimeUnixNano: {
+                  low: 1000000,
+                  high: 406528574,
+                  unsigned: true,
+                },
+                endTimeUnixNano: {
+                  low: 2000000,
+                  high: 406528574,
+                  unsigned: true,
+                },
+                attributes: [
+                  {
+                    key: "langfuse.observation.type",
+                    value: { stringValue: "generation" },
+                  },
+                  {
+                    key: "model_name",
+                    value: { stringValue: "gpt-4.1" },
+                  },
+                  {
+                    key: "input",
+                    value: {
+                      stringValue: JSON.stringify([
+                        {
+                          role: "system",
+                          parts: [
+                            {
+                              type: "text",
+                              content: "You are a helpful audience assistant.",
+                            },
+                          ],
+                        },
+                        {
+                          role: "user",
+                          parts: [
+                            {
+                              type: "text",
+                              content:
+                                "Create an audience segment near my Lyon store.",
+                            },
+                          ],
+                        },
+                      ]),
+                    },
+                  },
+                  {
+                    key: "output",
+                    value: {
+                      stringValue: JSON.stringify([
+                        {
+                          role: "assistant",
+                          parts: [
+                            {
+                              type: "tool_call",
+                              id: toolCallId,
+                              name: "create_location_segment",
+                              arguments: {
+                                recommended_location_segment: {
+                                  pointsOfInterest: [
+                                    {
+                                      name: "Lyon Store",
+                                      latitude: 45.764,
+                                      longitude: 4.8357,
+                                    },
+                                  ],
+                                  radiusInKm: 15,
+                                },
+                                segment_name: "Location - Lyon Store - 15km",
+                              },
+                            },
+                          ],
+                          finish_reason: "tool_call",
+                        },
+                      ]),
+                    },
+                  },
+                  {
+                    key: "model_request_parameters",
+                    value: {
+                      stringValue: JSON.stringify({
+                        temperature: 0,
+                        function_tools: [
+                          {
+                            name: "create_location_segment",
+                            description:
+                              "Creates a location segment for a point of interest.",
+                            parameters_json_schema: {
+                              type: "object",
+                              properties: {
+                                segment_name: { type: "string" },
+                              },
+                              required: ["segment_name"],
+                            },
+                          },
+                        ],
+                      }),
+                    },
+                  },
+                ],
+                events: [],
+                status: { code: 1 },
+              },
+            ],
+          },
+        ],
+      };
+
+      const events = await convertOtelSpanToIngestionEvent(
+        pydanticAiSpan,
+        new Set(),
+      );
+
+      const observationEvent = events.find(
+        (e) => e.type === "generation-create",
+      );
+
+      expect(observationEvent).toBeDefined();
+      expect(observationEvent?.body.name).toBe("pydantic-ai-tool-generation");
+
+      const parsedInput =
+        typeof observationEvent?.body.input === "string"
+          ? JSON.parse(observationEvent.body.input)
+          : observationEvent?.body.input;
+
+      expect(parsedInput.messages).toHaveLength(2);
+      expect(parsedInput.tools).toEqual([
+        {
+          name: "create_location_segment",
+          description: "Creates a location segment for a point of interest.",
+          parameters_json_schema: {
+            type: "object",
+            properties: {
+              segment_name: { type: "string" },
+            },
+            required: ["segment_name"],
+          },
+        },
+      ]);
+
+      expect(observationEvent?.body.toolDefinitions).toHaveProperty(
+        "create_location_segment",
+      );
+      expect(observationEvent?.body.toolCallNames).toEqual([
+        "create_location_segment",
+      ]);
+      expect(observationEvent?.body.toolCalls).toHaveLength(1);
+
+      const parsedToolCall = JSON.parse(observationEvent!.body.toolCalls[0]);
+      expect(parsedToolCall).toMatchObject({
+        id: toolCallId,
+        type: "function",
+      });
+      expect(JSON.parse(parsedToolCall.arguments)).toEqual({
+        recommended_location_segment: {
+          pointsOfInterest: [
+            {
+              name: "Lyon Store",
+              latitude: 45.764,
+              longitude: 4.8357,
+            },
+          ],
+          radiusInKm: 15,
+        },
+        segment_name: "Location - Lyon Store - 15km",
+      });
+    });
+
     it("should not duplicate system instructions when pydantic_ai.all_messages already has a system message", async () => {
       const traceId = "abcdef1234567890abcdef1234567891";
 
