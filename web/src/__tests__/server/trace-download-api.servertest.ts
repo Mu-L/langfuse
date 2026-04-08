@@ -82,12 +82,30 @@ describe("GET /api/traces/[traceId]/download", () => {
     });
     expect(res._getStatusCode()).toBe(200);
     expect(res.getHeader("Content-Disposition")).toBe(
-      'attachment; filename="trace-trace-1.json"',
+      "attachment; filename=\"trace-export.json\"; filename*=UTF-8''trace-trace-1.json",
     );
     expect(JSON.parse(res._getData())).toMatchObject({
       scores: [{ id: "score-1", traceId: "trace-1", observationId: null }],
       observations: [{ id: "obs-1", traceId: "trace-1" }],
     });
+  });
+
+  it("encodes quoted trace ids in the attachment filename", async () => {
+    mockBuildTraceExport.mockResolvedValue({
+      scores: [{ id: "score-1", traceId: 'foo"bar', observationId: null }],
+      observations: [{ id: "obs-1", traceId: 'foo"bar' }],
+    });
+
+    const { req, res } = createGetMocks({
+      traceId: 'foo"bar',
+      projectId,
+    });
+
+    await handler(req, res);
+
+    expect(res.getHeader("Content-Disposition")).toBe(
+      "attachment; filename=\"trace-export.json\"; filename*=UTF-8''trace-foo%22bar.json",
+    );
   });
 
   it("returns 404 when the trace does not exist", async () => {

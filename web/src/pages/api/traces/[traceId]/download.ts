@@ -24,6 +24,8 @@ function assertTraceExportSession(
   }
 }
 
+const buildDownloadFilename = (traceId: string) => `trace-${traceId}.json`;
+
 export default withMiddlewares({
   GET: async (req, res) => {
     const session = await getServerAuthSession({ req, res });
@@ -44,9 +46,10 @@ export default withMiddlewares({
     });
 
     res.setHeader("Content-Type", "application/json; charset=utf-8");
+    const downloadFilename = buildDownloadFilename(result.data.traceId);
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="trace-${result.data.traceId}.json"`,
+      `attachment; filename="trace-export.json"; filename*=UTF-8''${encodeURIComponent(downloadFilename)}`,
     );
 
     return res.status(200).send(JSON.stringify(payload, null, 2));
