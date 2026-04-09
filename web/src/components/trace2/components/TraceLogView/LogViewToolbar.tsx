@@ -32,7 +32,7 @@ import {
 } from "@/src/components/ui/hover-card";
 import { cn } from "@/src/utils/tailwind";
 
-export type LogViewToolbarProps = {
+export interface LogViewToolbarProps {
   /** Current search query */
   searchQuery: string;
   /** Callback when search query changes */
@@ -67,7 +67,7 @@ export type LogViewToolbarProps = {
   showMilliseconds?: boolean;
   /** Callback to toggle milliseconds display */
   onToggleMilliseconds?: () => void;
-};
+}
 
 /**
  * Toolbar for log view controls.
