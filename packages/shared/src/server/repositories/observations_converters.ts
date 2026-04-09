@@ -65,7 +65,7 @@ export const createModelCache = (projectId: string) => {
  * @param record - The record to convert (can be null/undefined)
  * @returns A new object with all values converted to numbers, or empty object if input is null/undefined
  */
-function convertNumericRecord(
+export function convertNumericRecord(
   record: Record<string, number> | null | undefined,
 ): Record<string, number> {
   if (!record) return {};

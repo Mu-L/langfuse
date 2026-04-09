@@ -13,6 +13,7 @@ import {
   getScoresAndCorrectionsForTraces,
   type ObservationRecordReadType,
   TraceObservationsTooLargeError,
+  convertNumericRecord,
 } from "@langfuse/shared/src/server";
 import { prisma } from "@langfuse/shared/src/db";
 import { env } from "@langfuse/shared/src/env";
@@ -428,12 +429,16 @@ export async function buildTraceExport({
       promptId: record.prompt_id ?? null,
       promptName: record.prompt_name ?? null,
       promptVersion: record.prompt_version ?? null,
-      providedUsageDetails: record.provided_usage_details ?? {},
+      providedUsageDetails: convertNumericRecord(
+        record.provided_usage_details ?? {},
+      ),
       latency: getDurationSeconds(startTime, endTime),
       timeToFirstToken: getDurationSeconds(startTime, completionStartTime),
-      usageDetails: record.usage_details ?? {},
-      costDetails: record.cost_details ?? {},
-      providedCostDetails: record.provided_cost_details ?? {},
+      usageDetails: convertNumericRecord(record.usage_details ?? {}),
+      costDetails: convertNumericRecord(record.cost_details ?? {}),
+      providedCostDetails: convertNumericRecord(
+        record.provided_cost_details ?? {},
+      ),
       usagePricingTierId: record.usage_pricing_tier_id ?? null,
       usagePricingTierName: record.usage_pricing_tier_name ?? null,
       toolCallNames: record.tool_call_names ?? [],
