@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  checks: write # Needed to create a check run for the license compliance check results
 
 jobs:
   license_check:
