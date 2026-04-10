@@ -174,6 +174,8 @@ async function getAuthorizedTrace(params: {
       shouldJsonParse: false,
     },
     clickhouseFeatureTag: "tracing-download",
+    excludeInputOutput: true,
+    excludeMetadata: true,
   });
 
   if (!clickhouseTrace) {
