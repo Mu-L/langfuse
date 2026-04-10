@@ -74,10 +74,13 @@ export function useLogViewDownload({
       // Cache-only mode: build from tree + cache (no fetching)
       setIsActionLoading(true);
       setTimeout(() => {
-        const data = buildDataFromCache();
-        void copyTextToClipboard(JSON.stringify(data, null, 2));
-        toast.success("Copied to clipboard (cache only)");
-        setIsActionLoading(false);
+        try {
+          const data = buildDataFromCache();
+          void copyTextToClipboard(JSON.stringify(data, null, 2));
+          toast.success("Copied to clipboard (cache only)");
+        } finally {
+          setIsActionLoading(false);
+        }
       }, 0);
     } else {
       // Load all mode: fetch all data if needed
@@ -124,10 +127,13 @@ export function useLogViewDownload({
       setIsActionLoading(true);
       // Use setTimeout to allow spinner to render before potentially heavy operation
       setTimeout(() => {
-        const data = buildDataFromCache();
-        downloadJsonData(data);
-        toast.success("Downloaded trace data (cache only)");
-        setIsActionLoading(false);
+        try {
+          const data = buildDataFromCache();
+          downloadJsonData(data);
+          toast.success("Downloaded trace data (cache only)");
+        } finally {
+          setIsActionLoading(false);
+        }
       }, 0);
     } else {
       // Load all mode: fetch all data if needed
