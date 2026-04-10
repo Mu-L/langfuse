@@ -46,6 +46,7 @@ export interface TraceExportObservation {
   type: string;
   environment: string;
   name: string | null;
+  level: string | null;
   traceName: string;
   statusMessage: string | null;
   version: string | null;
@@ -169,6 +170,7 @@ const getObservationRecordsForTrace = async (params: {
     start_time,
     end_time,
     name,
+    level,
     ${
       omitLargeFields
         ? "CAST(map(), 'Map(String, String)') AS metadata,"
@@ -418,6 +420,7 @@ export async function buildTraceExport({
       type: record.type,
       environment: record.environment,
       name: record.name ?? null,
+      level: record.level ?? null,
       traceName: trace.name ?? "",
       statusMessage: record.status_message ?? null,
       version: record.version ?? null,
