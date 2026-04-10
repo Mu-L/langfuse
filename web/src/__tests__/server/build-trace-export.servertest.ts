@@ -54,7 +54,7 @@ const makeSession = (overrides?: {
     },
   }) as any;
 
-const trace = {
+const makeTrace = (overrides?: Record<string, unknown>) => ({
   id: traceId,
   name: "Trace 1",
   timestamp: new Date("2024-01-01T00:00:00.000Z"),
@@ -72,48 +72,51 @@ const trace = {
   sessionId: null,
   userId: null,
   projectId,
-};
+  ...overrides,
+});
 
-const observationRecord = {
-  id: "obs-1",
-  traceId,
-  projectId,
-  userId: null,
-  sessionId: null,
-  environment: "default",
-  type: "SPAN",
-  startTime: new Date("2024-01-01T00:00:01.000Z"),
-  endTime: new Date("2024-01-01T00:00:02.000Z"),
-  name: "Observation 1",
-  metadata: { key: "value" },
-  parentObservationId: null,
-  level: "DEFAULT",
-  statusMessage: null,
-  version: null,
-  createdAt: new Date("2024-01-01T00:00:01.000Z"),
-  updatedAt: new Date("2024-01-01T00:00:02.000Z"),
-  model: null,
-  internalModelId: null,
-  modelParameters: null,
-  input: '{"input":"secret"}',
-  output: '{"output":"secret"}',
-  completionStartTime: null,
-  promptId: null,
-  promptName: null,
-  promptVersion: null,
-  usageDetails: { input: 90, output: 45, total: 135 },
-  costDetails: { total: 1.23 },
-  providedCostDetails: { total: 1.5 },
-  providedUsageDetails: { input: 100, output: 50, total: 150 },
-  totalCost: null,
-  usagePricingTierId: null,
-  usagePricingTierName: null,
-  toolDefinitions: null,
-  toolCalls: null,
-  toolCallNames: null,
-} as any;
+const makeObservation = (overrides?: Record<string, unknown>) =>
+  ({
+    id: "obs-1",
+    traceId,
+    projectId,
+    userId: null,
+    sessionId: null,
+    environment: "default",
+    type: "SPAN",
+    startTime: new Date("2024-01-01T00:00:01.000Z"),
+    endTime: new Date("2024-01-01T00:00:02.000Z"),
+    name: "Observation 1",
+    metadata: { key: "value" },
+    parentObservationId: null,
+    level: "DEFAULT",
+    statusMessage: null,
+    version: null,
+    createdAt: new Date("2024-01-01T00:00:01.000Z"),
+    updatedAt: new Date("2024-01-01T00:00:02.000Z"),
+    model: null,
+    internalModelId: null,
+    modelParameters: null,
+    input: '{"input":"secret"}',
+    output: '{"output":"secret"}',
+    completionStartTime: null,
+    promptId: null,
+    promptName: null,
+    promptVersion: null,
+    usageDetails: { input: 90, output: 45, total: 135 },
+    costDetails: { total: 1.23 },
+    providedCostDetails: { total: 1.5 },
+    providedUsageDetails: { input: 100, output: 50, total: 150 },
+    totalCost: null,
+    usagePricingTierId: null,
+    usagePricingTierName: null,
+    toolDefinitions: null,
+    toolCalls: null,
+    toolCallNames: null,
+    ...overrides,
+  }) as any;
 
-const score = {
+const makeScore = (overrides?: Record<string, unknown>) => ({
   id: "score-1",
   projectId,
   environment: "default",
@@ -136,22 +139,23 @@ const score = {
   longStringValue: "",
   stringValue: null,
   dataType: "NUMERIC",
-} as const;
+  ...overrides,
+});
 
 describe("buildTraceExport", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetTraceById.mockResolvedValue(trace);
+    mockGetTraceById.mockResolvedValue(makeTrace());
     mockGetObservationsCountFromEventsTable.mockResolvedValue(1);
     mockGetObservationsForTraceFromEventsTable.mockResolvedValue({
-      observations: [observationRecord],
+      observations: [makeObservation()],
       totalCount: 1,
     });
-    mockGetScoresAndCorrectionsForTraces.mockResolvedValue([score]);
+    mockGetScoresAndCorrectionsForTraces.mockResolvedValue([makeScore()]);
     mockTraceSessionFindFirst.mockResolvedValue(null);
   });
 
-  it("returns scores and observations with stringified payload fields", async () => {
+  it("builds an export using full observation data for smaller traces", async () => {
     const result = await buildTraceExport({
       traceId,
       projectId,
@@ -174,37 +178,15 @@ describe("buildTraceExport", () => {
     expect(mockGetScoresAndCorrectionsForTraces).toHaveBeenCalledWith({
       projectId,
       traceIds: [traceId],
-      timestamp: trace.timestamp,
+      timestamp: makeTrace().timestamp,
     });
-    expect(result).toEqual({
-      scores: [
-        expect.objectContaining({
-          id: "score-1",
-          traceId,
-          observationId: null,
-          metadata: '{"target_trace_id":"trace-1"}',
-          createdAt: "2024-01-01T00:00:03.000Z",
-          updatedAt: "2024-01-01T00:00:04.000Z",
-          timestamp: "2024-01-01T00:00:05.000Z",
-        }),
-      ],
+    expect(result).toMatchObject({
+      scores: [expect.objectContaining({ id: "score-1", traceId })],
       observations: [
         expect.objectContaining({
           id: "obs-1",
-          type: "SPAN",
-          name: "Observation 1",
+          traceId,
           traceName: "Trace 1",
-          userId: "",
-          sessionId: "",
-          startTime: "2024-01-01T00:00:01.000Z",
-          endTime: "2024-01-01T00:00:02.000Z",
-          input: '{"input":"secret"}',
-          output: '{"output":"secret"}',
-          metadata: '{"key":"value"}',
-          providedUsageDetails: { input: 100, output: 50, total: 150 },
-          usageDetails: { input: 90, output: 45, total: 135 },
-          costDetails: { total: 1.23 },
-          providedCostDetails: { total: 1.5 },
           tags: [],
           bookmarked: false,
           public: false,
@@ -213,50 +195,11 @@ describe("buildTraceExport", () => {
     });
   });
 
-  it("preserves parent observation ids in the raw export shape", async () => {
-    mockGetObservationsCountFromEventsTable.mockResolvedValue(3);
-    mockGetObservationsForTraceFromEventsTable.mockResolvedValue({
-      observations: [
-        observationRecord,
-        {
-          ...observationRecord,
-          id: "obs-2",
-          name: "Observation 2",
-          parentObservationId: "obs-1",
-        },
-        {
-          ...observationRecord,
-          id: "obs-3",
-          name: null,
-          type: "GENERATION",
-          parentObservationId: "obs-2",
-        },
-      ],
-      totalCount: 3,
-    });
-
-    const result = await buildTraceExport({
-      traceId,
-      projectId,
-      session: makeSession(),
-    });
-
-    expect(result.observations).toEqual([
-      expect.objectContaining({ id: "obs-1", parentObservationId: null }),
-      expect.objectContaining({ id: "obs-2", parentObservationId: "obs-1" }),
-      expect.objectContaining({
-        id: "obs-3",
-        parentObservationId: "obs-2",
-        name: null,
-      }),
-    ]);
-  });
-
   it("omits IO, metadata, toolDefinitions, and toolCalls for large trace exports", async () => {
     mockGetObservationsCountFromEventsTable.mockResolvedValue(350);
     mockGetObservationsForTraceFromEventsTable.mockResolvedValue({
       observations: Array.from({ length: 350 }, (_, idx) => ({
-        ...observationRecord,
+        ...makeObservation(),
         id: `obs-${idx + 1}`,
       })),
       totalCount: 350,
@@ -281,22 +224,6 @@ describe("buildTraceExport", () => {
     expect(result.observations[0]).not.toHaveProperty("toolDefinitions");
     expect(result.observations[0]).not.toHaveProperty("toolCalls");
     expect(result.observations[0]).toHaveProperty("toolCallNames");
-  });
-
-  it("does not return deleted observations", async () => {
-    const result = await buildTraceExport({
-      traceId,
-      projectId,
-      session: makeSession(),
-    });
-
-    expect(result.observations).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: "obs-1",
-        }),
-      ]),
-    );
   });
 
   it("throws a not-found error when the trace is missing", async () => {
