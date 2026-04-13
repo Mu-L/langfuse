@@ -8,7 +8,6 @@ import {
 import { prisma } from "@langfuse/shared/src/db";
 import { sendAdminAccessWebhook } from "@/src/server/adminAccessWebhook";
 import { TRACE_DOWNLOAD_OMIT_LARGE_FIELDS_THRESHOLD } from "../shared/traceDownloadConfig";
-import { toDomainArrayWithStringifiedMetadata } from "@/src/utils/clientSideDomainTypes";
 
 export type TraceExportSession = {
   user: {
@@ -165,16 +164,14 @@ export async function buildTraceExport({
     timestamp: trace.timestamp,
   });
 
-  const scores = toDomainArrayWithStringifiedMetadata(scoreRecords).map(
-    (score) => ({
-      ...score,
-      stringValue: score.stringValue ?? null,
-      metadata: score.metadata ?? null,
-      createdAt: score.createdAt.toISOString(),
-      updatedAt: score.updatedAt.toISOString(),
-      timestamp: score.timestamp.toISOString(),
-    }),
-  );
+  const scores = scoreRecords.map((score) => ({
+    ...score,
+    stringValue: score.stringValue ?? null,
+    metadata: score.metadata ?? null,
+    createdAt: score.createdAt.toISOString(),
+    updatedAt: score.updatedAt.toISOString(),
+    timestamp: score.timestamp.toISOString(),
+  }));
 
   const observations = observationRecords.map((record) => {
     return {
