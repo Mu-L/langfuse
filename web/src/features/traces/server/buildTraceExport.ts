@@ -239,9 +239,7 @@ export async function buildTraceExport({
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
       model: record.model ?? null,
-      modelParameters: record.modelParameters
-        ? JSON.stringify(record.modelParameters)
-        : null,
+      modelParameters: record.modelParameters,
       internalModelId: record.internalModelId ?? null,
       completionStartTime: record.completionStartTime?.toISOString() ?? null,
       promptId: record.promptId ?? null,
@@ -266,8 +264,8 @@ export async function buildTraceExport({
         ? {
             toolDefinitions: record.toolDefinitions ?? {},
             toolCalls: record.toolCalls ?? [],
-            input: record.input ? JSON.stringify(record.input) : null,
-            output: record.output ? JSON.stringify(record.output) : null,
+            input: record.input,
+            output: record.output,
             metadata: JSON.stringify(record.metadata ?? {}),
           }
         : {}),
