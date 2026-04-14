@@ -12,6 +12,7 @@ import {
   invalidateCachedApiKeys as invalidateCachedApiKeysShared,
   invalidateCachedOrgApiKeys as invalidateCachedOrgApiKeysShared,
   invalidateCachedProjectApiKeys as invalidateCachedProjectApiKeysShared,
+  LocalCache,
 } from "@langfuse/shared/src/server";
 import {
   type PrismaClient,
@@ -25,6 +26,19 @@ import { getOrganizationPlanServerSide } from "@/src/features/entitlements/serve
 import { API_KEY_NON_EXISTENT } from "@langfuse/shared/src/server";
 import { type z } from "zod";
 import { CloudConfigSchema, isPlan } from "@langfuse/shared";
+
+type OrgEnrichedApiKeyValue = z.infer<typeof OrgEnrichedApiKey>;
+
+const apiKeyLocalCache = new LocalCache<OrgEnrichedApiKeyValue>({
+  namespace: "api_key",
+  enabled: env.LANGFUSE_LOCAL_CACHE_API_KEY_ENABLED === "true",
+  ttlMs: env.LANGFUSE_LOCAL_CACHE_API_KEY_TTL_MS,
+  max: env.LANGFUSE_LOCAL_CACHE_API_KEY_MAX,
+});
+
+export const clearApiKeyLocalCache = (): void => {
+  apiKeyLocalCache.clear();
+};
 
 export class ApiAuthService {
   prisma: PrismaClient;
@@ -40,14 +54,17 @@ export class ApiAuthService {
   // - when the plan of the org changes, the plan in the API key cache needs to be updated as well
   async invalidateCachedApiKeys(apiKeys: ApiKey[], identifier: string) {
     await invalidateCachedApiKeysShared(apiKeys, identifier, this.redis);
+    apiKeyLocalCache.clear();
   }
 
   async invalidateCachedOrgApiKeys(orgId: string) {
     await invalidateCachedOrgApiKeysShared(orgId, this.redis);
+    apiKeyLocalCache.clear();
   }
 
   async invalidateCachedProjectApiKeys(projectId: string) {
     await invalidateCachedProjectApiKeysShared(projectId, this.redis);
+    apiKeyLocalCache.clear();
   }
 
   /**
@@ -288,7 +305,13 @@ export class ApiAuthService {
   }
 
   private async fetchApiKeyAndAddToRedis(hash: string) {
-    // first get the API key from redis, this does not throw
+    // L1: check in-process local cache (avoids Redis round-trip for hot keys)
+    const localHit = apiKeyLocalCache.get(hash);
+    if (localHit) {
+      return localHit;
+    }
+
+    // L2: check Redis
     const redisApiKey = await this.fetchApiKeyFromRedis(hash);
 
     if (redisApiKey === API_KEY_NON_EXISTENT) {
@@ -296,15 +319,15 @@ export class ApiAuthService {
       throw new Error("Invalid credentials");
     }
 
-    // if we found something, return the object.
     if (redisApiKey) {
       recordIncrement("langfuse.api_key.cache_hit", 1);
+      apiKeyLocalCache.set(hash, redisApiKey);
       return redisApiKey;
     }
 
     recordIncrement("langfuse.api_key.cache_miss", 1);
 
-    // if redis not available or object not found, try the database
+    // L3: fall through to Postgres
     const apiKeyAndOrganisation = await this.prisma.apiKey.findUnique({
       where: { fastHashedSecretKey: hash },
       include: {
@@ -313,14 +336,15 @@ export class ApiAuthService {
       },
     });
 
-    // add the key to redis for future use if available, this does not throw
-    // only do so if the new hashkey exists already.
     if (apiKeyAndOrganisation && apiKeyAndOrganisation.fastHashedSecretKey) {
       const cachedApiKey = this.convertToRedisRepresentation(
         apiKeyAndOrganisation,
       );
       await this.addApiKeyToRedis(hash, cachedApiKey);
+      apiKeyLocalCache.set(hash, cachedApiKey);
+      return cachedApiKey;
     }
+
     return apiKeyAndOrganisation
       ? this.convertToRedisRepresentation(apiKeyAndOrganisation)
       : null;
