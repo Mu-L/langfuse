@@ -41,7 +41,7 @@ import {
   getCategoricalScoresGroupedByName,
   getDatasetRunsTableRowsCh,
   getDatasetRunsTableCountCh,
-  validateWebhookURL,
+  validateWebhookURLAndGetIPs,
   getDatasetRunItemsWithoutIOByItemIds,
   getDatasetItemsWithRunDataCount,
   getDatasetItemIdsWithRunData,
@@ -1745,7 +1745,7 @@ export const datasetRouter = createTRPCRouter({
       }
 
       try {
-        await validateWebhookURL(dataset.remoteExperimentUrl);
+        await validateWebhookURLAndGetIPs(dataset.remoteExperimentUrl);
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",

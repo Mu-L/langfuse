@@ -14,7 +14,7 @@ import {
 import { decrypt, createSignatureHeader } from "@langfuse/shared/encryption";
 import { prisma } from "@langfuse/shared/src/db";
 import {
-  validateWebhookURL,
+  validateWebhookURLAndGetIPs,
   whitelistFromEnv,
   fetchWithSecureRedirects,
 } from "@langfuse/shared/src/server";
@@ -144,9 +144,10 @@ async function executeHttpAction({
         }, env.LANGFUSE_WEBHOOK_TIMEOUT_MS);
 
         try {
-          // Skip validation when flag is set (for tests with MSW mocking)
+          // Validate URL and obtain resolved IPs for DNS pinning
+          let resolvedIPs: string[] | undefined;
           if (!skipValidation) {
-            await validateWebhookURL(url);
+            resolvedIPs = await validateWebhookURLAndGetIPs(url);
           }
 
           const redirectResult = await fetchWithSecureRedirects(
@@ -161,6 +162,7 @@ async function executeHttpAction({
               maxRedirects: env.LANGFUSE_WEBHOOK_MAX_REDIRECTS,
               skipValidation,
               whitelist: whitelistFromEnv(),
+              initialResolvedIPs: resolvedIPs,
             },
           );
 

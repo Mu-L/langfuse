@@ -33,7 +33,7 @@ export function llmBaseUrlWhitelistFromEnv(): LlmBaseUrlValidationWhitelist {
 export async function validateLlmConnectionBaseURL(
   urlString: string,
   whitelist: LlmBaseUrlValidationWhitelist = llmBaseUrlWhitelistFromEnv(),
-): Promise<void> {
+): Promise<string[]> {
   const effectiveWhitelist = env.NEXT_PUBLIC_LANGFUSE_CLOUD_REGION
     ? {
         hosts: [],
@@ -56,7 +56,15 @@ export async function validateLlmConnectionBaseURL(
   const hostname = normalizeHostname(url.hostname);
 
   if (effectiveWhitelist.hosts.includes(hostname)) {
-    return;
+    // Whitelisted host — skip blocking checks but still resolve for IP pinning
+    if (isIPAddress(hostname)) {
+      return [hostname];
+    }
+    try {
+      return await resolveHost(hostname);
+    } catch {
+      return [];
+    }
   }
 
   if (isHostnameBlocked(hostname)) {
@@ -81,7 +89,7 @@ export async function validateLlmConnectionBaseURL(
       throw new Error("Blocked IP address detected");
     }
 
-    return;
+    return [hostname];
   }
 
   let ips: string[];
@@ -89,7 +97,7 @@ export async function validateLlmConnectionBaseURL(
     ips = await resolveHost(hostname);
   } catch {
     // DNS resolution is best-effort here so valid custom gateways do not fail at write time.
-    return;
+    return [];
   }
 
   for (const ip of ips) {
@@ -100,6 +108,7 @@ export async function validateLlmConnectionBaseURL(
       throw new Error("Blocked IP address detected");
     }
   }
+  return ips;
 }
 
 function normalizeURL(urlString: string): string {

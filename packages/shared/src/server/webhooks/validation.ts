@@ -43,17 +43,16 @@ export function whitelistFromEnv(): WebhookValidationWhitelist {
 }
 
 /**
- * Validates a webhook URL to prevent SSRF attacks by blocking internal/private IP addresses
- * Should be called when saving webhook URLs and before sending webhooks
+ * Validates a webhook URL to prevent SSRF attacks by blocking internal/private IP addresses.
+ * Returns the resolved IP addresses so callers can pin DNS and avoid TOCTOU races
+ * between validation and the actual HTTP request.
  *
- * Security Note: This validation has a Time-of-Check-Time-of-Use (TOCTOU) vulnerability
- * where DNS can change between validation and actual HTTP request. For maximum security,
- * the HTTP client should also implement IP blocking at connection time.
+ * Should be called when saving webhook URLs and before sending webhooks.
  */
-export async function validateWebhookURL(
+export async function validateWebhookURLAndGetIPs(
   urlString: string,
   whitelist: WebhookValidationWhitelist = whitelistFromEnv(),
-): Promise<void> {
+): Promise<string[]> {
   // Step 1: Basic URL parsing and normalization
   let url: URL;
   try {
@@ -77,8 +76,11 @@ export async function validateWebhookURL(
   const hostname = normalizeHostname(url.hostname);
 
   if (whitelist.hosts.includes(hostname)) {
-    // skip further checks if hostname is whitelisted
-    return;
+    // Whitelisted host — skip blocking checks but still resolve for IP pinning
+    if (isIPAddress(hostname)) {
+      return [hostname];
+    }
+    return resolveHost(hostname);
   }
 
   // Block obviously dangerous hostnames
@@ -96,6 +98,7 @@ export async function validateWebhookURL(
       // Throw generic error to user to prevent IP leakage
       throw new Error("Blocked IP address detected");
     }
+    return [hostname];
   }
 
   // Step 5: DNS resolution and validation
@@ -110,6 +113,7 @@ export async function validateWebhookURL(
       throw new Error("Blocked IP address detected");
     }
   }
+  return ips;
 }
 
 /**

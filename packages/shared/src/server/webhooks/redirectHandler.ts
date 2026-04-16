@@ -1,6 +1,9 @@
-import { validateWebhookURL } from "./validation";
+import { validateWebhookURLAndGetIPs } from "./validation";
 import type { WebhookValidationWhitelist } from "./validation";
+import { createPinnedAgent } from "./pinnedAgent";
+import { env } from "../../env";
 import { logger } from "../logger";
+import { type Agent } from "undici";
 
 /**
  * Custom error for redirect validation failures
@@ -59,6 +62,8 @@ export interface RedirectOptions {
   maxRedirects: number;
   skipValidation?: boolean;
   whitelist?: WebhookValidationWhitelist;
+  /** Pre-resolved IPs from validateWebhookURL for the initial URL. */
+  initialResolvedIPs?: string[];
 }
 
 /**
@@ -92,15 +97,25 @@ export async function fetchWithSecureRedirects(
   options: RequestInit,
   redirectOptions: RedirectOptions,
 ): Promise<RedirectResult> {
-  const { maxRedirects, skipValidation = false, whitelist } = redirectOptions;
+  const {
+    maxRedirects,
+    skipValidation = false,
+    whitelist,
+    initialResolvedIPs,
+  } = redirectOptions;
 
   // Track redirect chain for loop detection and logging
   const redirectChain: string[] = [];
   let currentUrl = url;
   let redirectDepth = 0;
+  // IPs validated by the caller (or by redirect-hop validation below).
+  // When an HTTPS_PROXY is configured the proxy handles DNS + connection
+  // routing, so we skip our own IP pinning to avoid conflicts.
+  const useIPPinning = !env.HTTPS_PROXY;
+  let currentResolvedIPs = useIPPinning ? initialResolvedIPs : undefined;
 
   // Force manual redirect handling to prevent automatic following
-  const fetchOptions: RequestInit = {
+  const baseFetchOptions: RequestInit = {
     ...options,
     redirect: "manual",
   };
@@ -112,8 +127,22 @@ export async function fetchWithSecureRedirects(
       maxRedirects,
     });
 
-    // Fetch the current URL
-    const response = await fetch(currentUrl, fetchOptions);
+    // Build per-request fetch options, pinning DNS when we have validated IPs
+    let agent: Agent | undefined;
+    const fetchOptions = { ...baseFetchOptions };
+    if (currentResolvedIPs?.length) {
+      agent = createPinnedAgent(currentResolvedIPs);
+      // Node.js global fetch (undici) supports the dispatcher option at runtime
+      (fetchOptions as Record<string, unknown>).dispatcher = agent;
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(currentUrl, fetchOptions);
+    } finally {
+      // Close the single-use agent to release its connection pool
+      await agent?.close();
+    }
 
     // Check if this is a redirect response (3xx status codes)
     const isRedirect =
@@ -179,10 +208,14 @@ export async function fetchWithSecureRedirects(
       ]);
     }
 
-    // Validate the redirect target URL before following
+    // Validate the redirect target URL and obtain pinned IPs for the next hop
     if (!skipValidation) {
       try {
-        await validateWebhookURL(redirectUrl, whitelist);
+        const resolvedIPs = await validateWebhookURLAndGetIPs(
+          redirectUrl,
+          whitelist,
+        );
+        currentResolvedIPs = useIPPinning ? resolvedIPs : undefined;
       } catch (error) {
         logger.warn("Redirect validation failed", {
           from: currentUrl,
@@ -197,6 +230,8 @@ export async function fetchWithSecureRedirects(
           redirectDepth,
         );
       }
+    } else {
+      currentResolvedIPs = undefined;
     }
 
     // Follow the redirect
