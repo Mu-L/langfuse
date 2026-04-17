@@ -76,11 +76,17 @@ export async function validateWebhookURLAndGetIPs(
   const hostname = normalizeHostname(url.hostname);
 
   if (whitelist.hosts.includes(hostname)) {
-    // Whitelisted host — skip blocking checks but still resolve for IP pinning
+    // Whitelisted host — skip blocking checks but still resolve for IP pinning.
+    // DNS resolution is best-effort: a transient failure should not block a
+    // whitelisted webhook; returning [] lets the caller fall back to unpinned delivery.
     if (isIPAddress(hostname)) {
       return [hostname];
     }
-    return resolveHost(hostname);
+    try {
+      return await resolveHost(hostname);
+    } catch {
+      return [];
+    }
   }
 
   // Block obviously dangerous hostnames
