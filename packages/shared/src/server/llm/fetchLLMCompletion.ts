@@ -536,7 +536,7 @@ export async function fetchLLMCompletion(
         timeoutMs,
         abortController: runtimeTimeoutController,
         operation: () =>
-          (chatModel as any)
+          chatModel
             .withStructuredOutput(
               structuredOutputSchema,
               structuredOutputConfig,
