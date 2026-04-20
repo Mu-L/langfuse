@@ -490,6 +490,7 @@ export async function fetchLLMCompletion(
       callbacks: finalCallbacks,
       maxRetries,
       apiKey,
+      maxReasoningTokens: modelParams.maxReasoningTokens,
       thinkingBudget: googleProviderOptions?.thinkingBudget,
       thinkingLevel: googleProviderOptions?.thinkingLevel as any, // Typecast as thinkingLevel is intentionally looser typed
     });
