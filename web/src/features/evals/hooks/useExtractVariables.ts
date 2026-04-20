@@ -159,7 +159,12 @@ export function useExtractVariables({
         mapping.selectedColumnId,
         mapping.jsonSelector ?? undefined,
       );
-      return { variable, value, error };
+      return {
+        variable,
+        value,
+        error,
+        jsonSelector: mapping.jsonSelector ?? null,
+      };
     });
 
     // Resolve all promises and update state
@@ -169,7 +174,11 @@ export function useExtractVariables({
           (result) => result.error instanceof Error,
         );
         if (firstError) {
-          setExtractionError(firstError.error as Error);
+          const baseMessage = (firstError.error as Error).message;
+          const message = firstError.jsonSelector
+            ? `${firstError.jsonSelector}: ${baseMessage}`
+            : baseMessage;
+          setExtractionError(new Error(message));
         }
         setExtractedVariables(results);
         // Update the ref to the current mapping string to track changes
