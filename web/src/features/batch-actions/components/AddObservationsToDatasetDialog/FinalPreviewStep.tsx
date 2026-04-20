@@ -67,7 +67,7 @@ export function FinalPreviewStep({
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500" />
             <div className="space-y-1">
               <p className="text-sm font-medium text-amber-600 dark:text-amber-500">
-                Some JSON paths did not match the preview observation
+                Some JSONPaths did not match the preview observation
               </p>
               <p className="text-xs text-amber-600/80 dark:text-amber-500/80">
                 Observations with failed mappings will be skipped during

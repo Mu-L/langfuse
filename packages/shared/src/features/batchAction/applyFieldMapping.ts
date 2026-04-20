@@ -31,7 +31,7 @@ export type JsonPathMissInfo = {
 export type JsonPathErrorInfo = JsonPathMissInfo & { message: string };
 
 /**
- * Test if a JSON path is valid against the given data
+ * Test if a JSONPath is valid against the given data
  */
 export function testJsonPath(props: { jsonPath: string; data: unknown }): {
   success: boolean;
@@ -51,7 +51,7 @@ export function testJsonPath(props: { jsonPath: string; data: unknown }): {
 }
 
 /**
- * Evaluate a JSON path against the given data and return the result
+ * Evaluate a JSONPath against the given data and return the result
  */
 export function evaluateJsonPath(data: unknown, jsonPath: string): unknown {
   const parsed = typeof data === "string" ? parseJsonPrioritised(data) : data;
@@ -65,7 +65,7 @@ export function evaluateJsonPath(data: unknown, jsonPath: string): unknown {
 }
 
 /**
- * Check if a value is a JSON path (starts with $)
+ * Check if a value is a JSONPath (starts with $)
  */
 export function isJsonPath(value: string): boolean {
   return value.startsWith("$");
@@ -121,7 +121,7 @@ export function applyFieldMappingConfig(props: {
         sourceField,
         jsonPath,
         mappingKey,
-        message: error instanceof Error ? error.message : "Invalid JSON path",
+        message: error instanceof Error ? error.message : "Invalid JSONPath",
       });
       return { ok: false };
     }
@@ -142,7 +142,7 @@ export function applyFieldMappingConfig(props: {
       }
 
       if (config.custom.type === "root") {
-        // Root mode: extract single value using JSON path
+        // Root mode: extract single value using JSONPath
         const rootConfig = config.custom.rootConfig;
         if (!rootConfig) {
           return observation[defaultSourceField];
@@ -184,7 +184,7 @@ export function applyFieldMappingConfig(props: {
 
           let resolvedValue: unknown;
           if (isJsonPath(entry.value)) {
-            // It's a JSON path - evaluate it
+            // It's a JSONPath - evaluate it
             const evaluated = safeEvaluate(
               entry.sourceField,
               entry.value,
@@ -271,7 +271,7 @@ export function applyFullMapping(props: {
         sourceField: info.sourceField,
         jsonPath: info.jsonPath,
         mappingKey: info.mappingKey,
-        message: `JSON path "${info.jsonPath}" did not match any data in "${info.sourceField}"${info.mappingKey ? ` (key: "${info.mappingKey}")` : ""}`,
+        message: `JSONPath "${info.jsonPath}" did not match any data in "${info.sourceField}"${info.mappingKey ? ` (key: "${info.mappingKey}")` : ""}`,
       });
     };
 
@@ -282,7 +282,7 @@ export function applyFullMapping(props: {
         sourceField: info.sourceField,
         jsonPath: info.jsonPath,
         mappingKey: info.mappingKey,
-        message: `JSON path evaluation error for "${field.key}"${
+        message: `JSONPath evaluation error for "${field.key}"${
           info.mappingKey ? ` (key: "${info.mappingKey}")` : ""
         }: ${info.message}`,
       });
@@ -316,7 +316,7 @@ export function applyFullMapping(props: {
 }
 
 /**
- * Generate autocomplete suggestions for JSON paths based on the data structure
+ * Generate autocomplete suggestions for JSONPaths based on the data structure
  */
 export function generateJsonPathSuggestions(
   data: unknown,

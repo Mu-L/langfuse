@@ -63,7 +63,7 @@ export function MappingPreviewPanel({
     return observationData[defaultSourceField];
   }, [observationData, config, defaultSourceField]);
 
-  // Compute result data and collect JSON path misses / syntax errors
+  // Compute result data and collect JSONPath misses / syntax errors
   const { resultData, jsonPathMisses, jsonPathErrors } = useMemo(() => {
     if (!observationData)
       return {
@@ -94,18 +94,18 @@ export function MappingPreviewPanel({
     return { resultData: data, jsonPathMisses: misses, jsonPathErrors: errors };
   }, [observationData, config, defaultSourceField]);
 
-  // Validate result against schema, and treat JSON path syntax errors as validation failures
+  // Validate result against schema, and treat JSONPath syntax errors as validation failures
   const validationResult = useMemo(() => {
     const jsonPathErrorItems: SchemaValidationError[] = jsonPathErrors.map(
       (err) => ({
         path: err.mappingKey
           ? `${err.sourceField} (key: "${err.mappingKey}")`
           : err.sourceField,
-        message: `Invalid JSON path "${err.jsonPath}": ${err.message}`,
+        message: `Invalid JSONPath "${err.jsonPath}": ${err.message}`,
       }),
     );
 
-    // Any JSON path syntax error blocks the mapping regardless of schema
+    // Any JSONPath syntax error blocks the mapping regardless of schema
     if (jsonPathErrorItems.length > 0) {
       return { isValid: false, errors: jsonPathErrorItems };
     }
@@ -284,9 +284,9 @@ export function MappingPreviewPanel({
           )}
         </div>
 
-        {/* JSON path syntax errors (always blocking) */}
+        {/* JSONPath syntax errors (always blocking) */}
         {jsonPathErrors.length > 0 && config.mode !== "none" && (
-          <IssueList variant="error" title="Invalid JSON path:">
+          <IssueList variant="error" title="Invalid JSONPath:">
             {jsonPathErrors.map((err, idx) => (
               <IssueItem key={idx} variant="error">
                 <span className="font-mono">{err.jsonPath}</span>
@@ -297,7 +297,7 @@ export function MappingPreviewPanel({
           </IssueList>
         )}
 
-        {/* Schema validation errors (only when no blocking JSON path errors) */}
+        {/* Schema validation errors (only when no blocking JSONPath errors) */}
         {hasSchema &&
           jsonPathErrors.length === 0 &&
           validationResult.errors.length > 0 && (
@@ -311,11 +311,11 @@ export function MappingPreviewPanel({
             </IssueList>
           )}
 
-        {/* JSON path warnings */}
+        {/* JSONPath warnings */}
         {jsonPathMisses.length > 0 && config.mode !== "none" && (
           <IssueList
             variant="warning"
-            title="JSON path warnings (preview observation):"
+            title="JSONPath warnings (preview observation):"
           >
             {jsonPathMisses.map((miss, idx) => (
               <IssueItem key={idx} variant="warning">

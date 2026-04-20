@@ -47,7 +47,7 @@ export function renderPromptPreviewFromObservation(params: {
       mapping.jsonSelector ?? undefined,
     );
     const rendered = error
-      ? `<invalid JSON path "${mapping.jsonSelector ?? ""}": ${error.message}>`
+      ? `<invalid JSONPath "${mapping.jsonSelector ?? ""}": ${error.message}>`
       : stringifyPreviewValue(value);
     variableValues.set(mapping.templateVariable, rendered);
   }
