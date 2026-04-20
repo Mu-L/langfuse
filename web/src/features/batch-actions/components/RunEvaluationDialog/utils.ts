@@ -41,12 +41,15 @@ export function renderPromptPreviewFromObservation(params: {
   const variableValues = new Map<string, string>();
 
   for (const mapping of variableMapping) {
-    const { value } = extractValueFromObject(
+    const { value, error } = extractValueFromObject(
       observation,
       mapping.selectedColumnId,
       mapping.jsonSelector ?? undefined,
     );
-    variableValues.set(mapping.templateVariable, stringifyPreviewValue(value));
+    const rendered = error
+      ? `<invalid JSON path "${mapping.jsonSelector ?? ""}": ${error.message}>`
+      : stringifyPreviewValue(value);
+    variableValues.set(mapping.templateVariable, rendered);
   }
 
   const renderedPrompt = prompt.replace(/{{([^{}]+)}}/g, (_match, variable) => {
