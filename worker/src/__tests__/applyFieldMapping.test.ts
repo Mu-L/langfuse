@@ -1022,4 +1022,178 @@ describe("applyFieldMapping", () => {
       expect(result).toEqual(sampleObservation.metadata);
     });
   });
+
+  describe("invalid JSON path syntax", () => {
+    const invalidPath = "$..[?(@.x=)]";
+
+    it("should not throw and report error for invalid root path", () => {
+      const errors: {
+        sourceField: string;
+        jsonPath: string;
+        mappingKey: string | null;
+        message: string;
+      }[] = [];
+
+      const result = applyFieldMappingConfig({
+        observation: sampleObservation,
+        config: {
+          mode: "custom",
+          custom: {
+            type: "root",
+            rootConfig: {
+              sourceField: "input",
+              jsonPath: invalidPath,
+            },
+          },
+        },
+        defaultSourceField: "input",
+        onJsonPathError: (info) => errors.push(info),
+      });
+
+      expect(result).toBeUndefined();
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({
+        sourceField: "input",
+        jsonPath: invalidPath,
+        mappingKey: null,
+      });
+      expect(errors[0].message).toBeTruthy();
+    });
+
+    it("should not throw and isolate invalid entries in keyValueMap", () => {
+      const errors: {
+        sourceField: string;
+        jsonPath: string;
+        mappingKey: string | null;
+        message: string;
+      }[] = [];
+
+      const result = applyFieldMappingConfig({
+        observation: sampleObservation,
+        config: {
+          mode: "custom",
+          custom: {
+            type: "keyValueMap",
+            keyValueMapConfig: {
+              entries: [
+                {
+                  id: "1",
+                  key: "good",
+                  sourceField: "input",
+                  value: "$.model",
+                },
+                {
+                  id: "2",
+                  key: "bad",
+                  sourceField: "input",
+                  value: invalidPath,
+                },
+              ],
+            },
+          },
+        },
+        defaultSourceField: "input",
+        onJsonPathError: (info) => errors.push(info),
+      });
+
+      expect(result).toEqual({ good: "gpt-4", bad: undefined });
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({
+        sourceField: "input",
+        jsonPath: invalidPath,
+        mappingKey: "bad",
+      });
+    });
+
+    it("should collect multiple errors from multiple invalid keyValueMap entries", () => {
+      const secondInvalidPath = "$..[?(@.y<)]";
+      const errors: {
+        sourceField: string;
+        jsonPath: string;
+        mappingKey: string | null;
+        message: string;
+      }[] = [];
+
+      const result = applyFieldMappingConfig({
+        observation: sampleObservation,
+        config: {
+          mode: "custom",
+          custom: {
+            type: "keyValueMap",
+            keyValueMapConfig: {
+              entries: [
+                {
+                  id: "1",
+                  key: "bad_one",
+                  sourceField: "input",
+                  value: invalidPath,
+                },
+                {
+                  id: "2",
+                  key: "good",
+                  sourceField: "input",
+                  value: "$.model",
+                },
+                {
+                  id: "3",
+                  key: "bad_two",
+                  sourceField: "output",
+                  value: secondInvalidPath,
+                },
+              ],
+            },
+          },
+        },
+        defaultSourceField: "input",
+        onJsonPathError: (info) => errors.push(info),
+      });
+
+      expect(result).toEqual({
+        bad_one: undefined,
+        good: "gpt-4",
+        bad_two: undefined,
+      });
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toMatchObject({
+        sourceField: "input",
+        jsonPath: invalidPath,
+        mappingKey: "bad_one",
+      });
+      expect(errors[1]).toMatchObject({
+        sourceField: "output",
+        jsonPath: secondInvalidPath,
+        mappingKey: "bad_two",
+      });
+    });
+
+    it("applyFullMapping should surface json_path_error for invalid paths", () => {
+      const result = applyFullMapping({
+        observation: sampleObservation,
+        mapping: {
+          input: {
+            mode: "custom",
+            custom: {
+              type: "root",
+              rootConfig: {
+                sourceField: "input",
+                jsonPath: invalidPath,
+              },
+            },
+          },
+          expectedOutput: { mode: "full" },
+          metadata: { mode: "none" },
+        },
+      });
+
+      expect(result.input).toBeUndefined();
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toMatchObject({
+        type: "json_path_error",
+        targetField: "input",
+        sourceField: "input",
+        jsonPath: invalidPath,
+        mappingKey: null,
+      });
+    });
+  });
 });

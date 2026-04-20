@@ -22,6 +22,14 @@ export type MappingError = {
   message: string;
 };
 
+export type JsonPathMissInfo = {
+  sourceField: SourceField;
+  jsonPath: string;
+  mappingKey: string | null;
+};
+
+export type JsonPathErrorInfo = JsonPathMissInfo & { message: string };
+
 /**
  * Test if a JSON path is valid against the given data
  */
@@ -87,13 +95,37 @@ export function applyFieldMappingConfig(props: {
   observation: ObservationData;
   config: FieldMappingConfig;
   defaultSourceField: SourceField;
-  onJsonPathMiss?: (info: {
-    sourceField: SourceField;
-    jsonPath: string;
-    mappingKey: string | null;
-  }) => void;
+  onJsonPathMiss?: (info: JsonPathMissInfo) => void;
+  onJsonPathError?: (info: JsonPathErrorInfo) => void;
 }): unknown {
-  const { observation, config, defaultSourceField, onJsonPathMiss } = props;
+  const {
+    observation,
+    config,
+    defaultSourceField,
+    onJsonPathMiss,
+    onJsonPathError,
+  } = props;
+
+  const safeEvaluate = (
+    sourceField: SourceField,
+    jsonPath: string,
+    mappingKey: string | null,
+  ): { ok: true; value: unknown } | { ok: false } => {
+    try {
+      return {
+        ok: true,
+        value: evaluateJsonPath(observation[sourceField], jsonPath),
+      };
+    } catch (error) {
+      onJsonPathError?.({
+        sourceField,
+        jsonPath,
+        mappingKey,
+        message: error instanceof Error ? error.message : "Invalid JSON path",
+      });
+      return { ok: false };
+    }
+  };
 
   switch (config.mode) {
     case "full":
@@ -116,8 +148,15 @@ export function applyFieldMappingConfig(props: {
           return observation[defaultSourceField];
         }
 
-        const sourceData = observation[rootConfig.sourceField];
-        const result = evaluateJsonPath(sourceData, rootConfig.jsonPath);
+        const evaluated = safeEvaluate(
+          rootConfig.sourceField,
+          rootConfig.jsonPath,
+          null,
+        );
+        if (!evaluated.ok) {
+          return undefined;
+        }
+        const result = evaluated.value;
         if (result === undefined && onJsonPathMiss) {
           onJsonPathMiss({
             sourceField: rootConfig.sourceField,
@@ -146,14 +185,22 @@ export function applyFieldMappingConfig(props: {
           let resolvedValue: unknown;
           if (isJsonPath(entry.value)) {
             // It's a JSON path - evaluate it
-            const sourceData = observation[entry.sourceField];
-            resolvedValue = evaluateJsonPath(sourceData, entry.value);
-            if (resolvedValue === undefined && onJsonPathMiss) {
-              onJsonPathMiss({
-                sourceField: entry.sourceField,
-                jsonPath: entry.value,
-                mappingKey: entry.key,
-              });
+            const evaluated = safeEvaluate(
+              entry.sourceField,
+              entry.value,
+              entry.key,
+            );
+            if (!evaluated.ok) {
+              resolvedValue = undefined;
+            } else {
+              resolvedValue = evaluated.value;
+              if (resolvedValue === undefined && onJsonPathMiss) {
+                onJsonPathMiss({
+                  sourceField: entry.sourceField,
+                  jsonPath: entry.value,
+                  mappingKey: entry.key,
+                });
+              }
             }
           } else {
             // It's a literal string (including empty string)
@@ -228,32 +275,33 @@ export function applyFullMapping(props: {
       });
     };
 
+    const onJsonPathError = (info: JsonPathErrorInfo) => {
+      errors.push({
+        type: "json_path_error",
+        targetField: field.key,
+        sourceField: info.sourceField,
+        jsonPath: info.jsonPath,
+        mappingKey: info.mappingKey,
+        message: `JSON path evaluation error for "${field.key}"${
+          info.mappingKey ? ` (key: "${info.mappingKey}")` : ""
+        }: ${info.message}`,
+      });
+    };
+
     try {
       results[field.key] = applyFieldMappingConfig({
         observation,
         config: field.config,
         defaultSourceField: field.defaultSourceField,
         onJsonPathMiss,
+        onJsonPathError,
       });
     } catch (error) {
-      // Capture rare JSONPath evaluation errors (e.g. malformed filter expressions)
-      const sourceField =
-        field.config.mode === "custom" && field.config.custom?.type === "root"
-          ? (field.config.custom.rootConfig?.sourceField ??
-            field.defaultSourceField)
-          : field.defaultSourceField;
-      const jsonPath =
-        field.config.mode === "custom" && field.config.custom?.type === "root"
-          ? (field.config.custom.rootConfig?.jsonPath ?? "")
-          : "";
-
-      errors.push({
-        type: "json_path_error",
-        targetField: field.key,
-        sourceField,
-        jsonPath,
+      onJsonPathError({
+        sourceField: field.defaultSourceField,
+        jsonPath: "",
         mappingKey: null,
-        message: `JSON path evaluation error for "${field.key}": ${error instanceof Error ? error.message : "Unknown error"}`,
+        message: error instanceof Error ? error.message : "Unknown error",
       });
       results[field.key] = undefined;
     }
