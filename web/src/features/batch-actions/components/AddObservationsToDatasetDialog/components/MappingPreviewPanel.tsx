@@ -72,10 +72,7 @@ export function MappingPreviewPanel({
         jsonPathErrors: [] as JsonPathErrorInfo[],
       };
 
-    const misses: JsonPathMissInfo[] = [];
-    const errors: JsonPathErrorInfo[] = [];
-
-    const data = applyFieldMappingConfig({
+    const result = applyFieldMappingConfig({
       observation: {
         input: observationData.input,
         output: observationData.output,
@@ -83,15 +80,13 @@ export function MappingPreviewPanel({
       },
       config,
       defaultSourceField,
-      onJsonPathMiss: (info) => {
-        misses.push(info);
-      },
-      onJsonPathError: (info) => {
-        errors.push(info);
-      },
     });
 
-    return { resultData: data, jsonPathMisses: misses, jsonPathErrors: errors };
+    return {
+      resultData: result.value,
+      jsonPathMisses: result.misses,
+      jsonPathErrors: result.errors,
+    };
   }, [observationData, config, defaultSourceField]);
 
   // Validate result against schema, and treat JSONPath syntax errors as validation failures
