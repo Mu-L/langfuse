@@ -995,7 +995,7 @@ export default function ExperimentItemsTable({
           type: BatchActionType.Create,
           label: "Evaluate",
           description: "Run evaluators on selected items",
-          icon: <LightbulbIcon className="mr-2 h-4 w-4" />,
+          icon: <LightbulbIcon className="h-4 w-4 sm:mr-2" />,
           customDialog: true,
           accessCheck: {
             scope: "evalJob:CUD",
@@ -1049,8 +1049,11 @@ export default function ExperimentItemsTable({
                       projectId={projectId}
                       actions={tableActions}
                       tableName={BatchExportTableName.Sessions}
-                      selectedCount={selectedItemCount}
-                      onClearSelection={() => setSelectAll(false)}
+                      selectedCount={selectAll ? totalCount : selectedItemCount}
+                      onClearSelection={() => {
+                        setSelectedRows({});
+                        setSelectAll(false);
+                      }}
                       onCustomAction={(actionId) => {
                         if (actionId === ActionId.ObservationBatchEvaluation) {
                           setShowRunEvaluationDialog(true);

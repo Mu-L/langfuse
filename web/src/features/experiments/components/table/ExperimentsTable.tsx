@@ -561,7 +561,7 @@ export default function ExperimentsTable({
       type: BatchActionType.Create,
       label: "Compare",
       description: "Compare selected experiments",
-      icon: <GitCompareArrows className="mr-2 h-4 w-4" />,
+      icon: <GitCompareArrows className="h-4 w-4 sm:mr-2" />,
       customDialog: true,
       disabled: tooManySelected,
       disabledReason: tooManySelected
@@ -579,7 +579,7 @@ export default function ExperimentsTable({
         type: BatchActionType.Create,
         label: "Run Evaluator",
         description: "Run evaluators on selected experiments",
-        icon: <LightbulbIcon className="mr-2 h-4 w-4" />,
+        icon: <LightbulbIcon className="h-4 w-4 sm:mr-2" />,
         customDialog: true,
         accessCheck: {
           scope: "evalJob:CUD",
