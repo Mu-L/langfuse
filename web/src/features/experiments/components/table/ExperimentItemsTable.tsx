@@ -6,6 +6,11 @@ import {
 } from "@/src/components/table/data-table-controls";
 import { ResizableFilterLayout } from "@/src/components/table/resizable-filter-layout";
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { RunEvaluationDialog } from "@/src/features/batch-actions/components/RunEvaluationDialog";
+import { LightbulbIcon } from "lucide-react";
+import { useHasProjectAccess } from "@/src/features/rbac/utils/checkProjectAccess";
+import { TableActionMenu } from "@/src/features/table/components/TableActionMenu";
+import { type TableAction } from "@/src/features/table/types";
 import { usePaginationState } from "@/src/hooks/usePaginationState";
 import { useSidebarFilterState } from "@/src/features/filters/hooks/useSidebarFilterState";
 import {
@@ -17,6 +22,9 @@ import {
   type FilterState,
   type FilterCondition,
   TableViewPresetTableName,
+  BatchExportTableName,
+  ActionId,
+  BatchActionType,
 } from "@langfuse/shared";
 import { ExperimentFilterPills } from "./ExperimentFilterPills";
 import { useOrderByState } from "@/src/features/orderBy/hooks/useOrderByState";
@@ -40,7 +48,7 @@ import {
   type ExperimentItemsTableProps,
   type ExperimentItemData,
   type ExperimentOutputData,
-  getExperimentColor,
+  getExperimentColorStyles,
 } from "./types";
 import { MemoizedIOTableCell } from "@/src/components/ui/IOTableCell";
 import {
@@ -101,21 +109,28 @@ const StackedExperimentCell = ({
     >
       {allExperimentIds.map((experimentId) => {
         const exp = experimentsById.get(experimentId);
+        const colorStyles = getExperimentColorStyles(
+          experimentId,
+          colorExperimentIds ?? allExperimentIds,
+        );
+        const content = exp ? renderValue(exp) : null;
         return (
           <div
             key={experimentId}
-            className={cn(
-              "flex min-h-0 items-start overflow-hidden px-2",
-              getExperimentColor(
-                experimentId,
-                colorExperimentIds ?? allExperimentIds,
-              ),
-            )}
+            className="flex min-h-0 items-start overflow-hidden py-0.5 pr-2 pl-1.5"
           >
-            {exp ? (
-              renderValue(exp)
+            {content ? (
+              <>
+                <span
+                  className={cn(
+                    "mt-0.5 mr-2 block h-4 w-0.5 shrink-0 rounded-full",
+                    colorStyles.markerClass,
+                  )}
+                />
+                {content}
+              </>
             ) : (
-              <span className="text-muted-foreground">-</span>
+              <span className="text-muted-foreground">—</span>
             )}
           </div>
         );
@@ -154,32 +169,41 @@ const StackedOutputCell = ({
     >
       {allExperimentIds.map((experimentId) => {
         const out = outputsByExperimentId.get(experimentId);
+        const colorStyles = getExperimentColorStyles(
+          experimentId,
+          colorExperimentIds ?? allExperimentIds,
+        );
         return (
           <div
             key={experimentId}
-            className={cn(
-              "flex min-h-0 items-start overflow-hidden",
-              getExperimentColor(
-                experimentId,
-                colorExperimentIds ?? allExperimentIds,
-              ),
-            )}
+            className="flex min-h-0 items-start overflow-hidden py-0.5 pr-1 pl-1.5"
           >
             {isLoading ? (
-              <MemoizedIOTableCell
-                isLoading={true}
-                data={null}
-                singleLine={singleLine}
-              />
+              <div className="flex min-w-0 items-start">
+                <span className="bg-muted mt-0.5 mr-2 block h-4 w-0.5 shrink-0 rounded-full" />
+                <MemoizedIOTableCell
+                  isLoading={true}
+                  data={null}
+                  singleLine={singleLine}
+                />
+              </div>
             ) : out?.output ? (
-              <MemoizedIOTableCell
-                isLoading={false}
-                data={out.output}
-                singleLine={singleLine}
-                className="bg-accent-light-green"
-              />
+              <div className="flex min-w-0 items-start">
+                <span
+                  className={cn(
+                    "mt-0.5 mr-2 block h-4 w-0.5 shrink-0 rounded-full",
+                    colorStyles.markerClass,
+                  )}
+                />
+                <MemoizedIOTableCell
+                  isLoading={false}
+                  data={out.output}
+                  singleLine={singleLine}
+                  className="bg-accent-light-green"
+                />
+              </div>
             ) : (
-              <span className="text-muted-foreground px-2 py-1">-</span>
+              <span className="text-muted-foreground px-2 py-1">—</span>
             )}
           </div>
         );
@@ -204,6 +228,11 @@ export default function ExperimentItemsTable({
 }: ExperimentItemsTableProps) {
   const { setDetailPageList } = useDetailPageLists();
   const [selectedRows, setSelectedRows] = useState<RowSelectionState>({});
+  const [showRunEvaluationDialog, setShowRunEvaluationDialog] = useState(false);
+  const hasEvalAccess = useHasProjectAccess({
+    projectId,
+    scope: "evalJob:CUD",
+  });
 
   const {
     baselineId,
@@ -251,7 +280,7 @@ export default function ExperimentItemsTable({
 
   const [rowHeight, setRowHeight] = useRowHeightLocalStorage(
     "experiment-items",
-    "s",
+    "l",
   );
 
   const [orderByState, setOrderByState] = useOrderByState({
@@ -261,7 +290,11 @@ export default function ExperimentItemsTable({
 
   // Use sidebar filter state for the sidebar UI (provides proper facets, options, etc.)
   // This is the single source of truth for filters
-  const queryFilter = useSidebarFilterState(experimentItemsFilterConfig, {});
+  const queryFilter = useSidebarFilterState(
+    experimentItemsFilterConfig,
+    {},
+    { stateLocation: "url" },
+  );
 
   // Create ref-based wrapper to avoid stale closure when queryFilter updates
   const queryFilterRef = useRef(queryFilter);
@@ -461,6 +494,7 @@ export default function ExperimentItemsTable({
     filter: scoreFilters.forExperimentItems({
       experimentIds: allExperimentIds,
     }),
+    isFilterDataPending: allExperimentIds.length === 0,
   });
 
   const {
@@ -475,6 +509,7 @@ export default function ExperimentItemsTable({
     }),
     prefix: "Trace",
     defaultHidden: true,
+    isFilterDataPending: allExperimentIds.length === 0,
   });
 
   const buildExperimentScoreColumns = useCallback(
@@ -485,12 +520,10 @@ export default function ExperimentItemsTable({
       scoreColumns.map((scoreCol) => ({
         ...scoreCol,
         // Override the cell renderer to show stacked scores for each experiment
-        cell: ({ row }: { row: any }) => {
+        cell: ({ row }) => {
           const experiments = row.original.experiments;
           const baselineExperiment = hasBaseline
-            ? experiments.find(
-                (exp: ExperimentItemData) => exp.experimentId === baselineId,
-              )
+            ? experiments.find((exp) => exp.experimentId === baselineId)
             : undefined;
           const baselineScoresData = baselineExperiment?.[scoreField] ?? null;
           // todo: fix properly
@@ -890,6 +923,87 @@ export default function ExperimentItemsTable({
     [paginationState, setPaginationState, totalCount],
   );
 
+  // Compute selected observation IDs for batch evaluation
+  const selectedObservationIds = useMemo(() => {
+    const selectedItemIds = Object.keys(selectedRows);
+    return (
+      rows
+        ?.filter((row) => selectedItemIds.includes(row.itemId))
+        .flatMap((row) => row.experiments.map((exp) => exp.observationId))
+        .filter((id): id is string => Boolean(id)) ?? []
+    );
+  }, [selectedRows, rows]);
+
+  // Get example observation for preview in the evaluation dialog
+  const exampleObservation = useMemo(() => {
+    // Find first experiment with a non-null observationId from selected rows
+    for (const row of rows ?? []) {
+      if (!selectedRows[row.itemId]) continue;
+      for (const exp of row.experiments) {
+        if (exp.observationId && exp.traceId) {
+          return {
+            id: exp.observationId,
+            traceId: exp.traceId,
+            startTime: exp.startTime,
+          };
+        }
+      }
+    }
+    return undefined;
+  }, [rows, selectedRows]);
+
+  // Count of selected items (not observations) for display
+  const selectedItemCount = useMemo(() => {
+    return Object.keys(selectedRows).filter((itemId) =>
+      rows?.some((row) => row.itemId === itemId),
+    ).length;
+  }, [selectedRows, rows]);
+
+  // Build query for batch actions (includes experiment context filter and root span filter)
+  const batchActionQuery = useMemo(
+    () => ({
+      filter: [
+        ...filtersByExperiment.flatMap((f) => f.filters),
+        // Include experiment context filter
+        ...(allExperimentIds.length > 0
+          ? [
+              {
+                column: "experimentId" as const,
+                operator: "any of" as const,
+                value: allExperimentIds,
+                type: "stringOptions" as const,
+              },
+            ]
+          : []),
+        // Only target root spans of experiment items
+        {
+          column: "isExperimentItemRootSpan" as const,
+          operator: "=" as const,
+          value: true,
+          type: "boolean" as const,
+        },
+      ],
+      orderBy: orderByState,
+    }),
+    [filtersByExperiment, orderByState, allExperimentIds],
+  );
+
+  const tableActions: TableAction[] = hasEvalAccess
+    ? [
+        {
+          id: ActionId.ObservationBatchEvaluation,
+          type: BatchActionType.Create,
+          label: "Evaluate",
+          description: "Run evaluators on selected items",
+          icon: <LightbulbIcon className="mr-2 h-4 w-4" />,
+          customDialog: true,
+          accessCheck: {
+            scope: "evalJob:CUD",
+          },
+        } as TableAction,
+      ]
+    : [];
+
   return (
     <DataTableControlsProvider
       tableName={experimentItemsFilterConfig.tableName}
@@ -927,6 +1041,23 @@ export default function ExperimentItemsTable({
               pageSize: paginationState.pageSize,
               pageIndex: paginationState.pageIndex,
             }}
+            actionButtons={
+              (selectAll || selectedItemCount > 0) && tableActions.length > 0
+                ? [
+                    <TableActionMenu
+                      key="experiment-items-multi-select-actions"
+                      projectId={projectId}
+                      actions={tableActions}
+                      tableName={BatchExportTableName.Sessions}
+                      onCustomAction={(actionId) => {
+                        if (actionId === ActionId.ObservationBatchEvaluation) {
+                          setShowRunEvaluationDialog(true);
+                        }
+                      }}
+                    />,
+                  ]
+                : undefined
+            }
           />
         )}
 
@@ -961,10 +1092,15 @@ export default function ExperimentItemsTable({
                   traceScoreOrder={traceScoreOrder}
                   peekView={peekConfig}
                   columnVisibility={columnVisibility}
+                  selectActionColumn={
+                    hideControls ? undefined : selectActionColumn
+                  }
+                  rowSelection={selectedRows}
+                  setRowSelection={setSelectedRows}
                 />
               ) : (
                 <div className="flex flex-1 items-center justify-center">
-                  <span className="text-muted-foreground">
+                  <span className="text-muted-foreground text-sm">
                     Please select a baseline experiment.
                   </span>
                 </div>
@@ -989,7 +1125,7 @@ export default function ExperimentItemsTable({
                 peekView={peekConfig}
                 noResultsMessage={
                   !hasSelectedRuns ? (
-                    <span className="text-muted-foreground">
+                    <span className="text-muted-foreground text-sm">
                       Please select a baseline experiment.
                     </span>
                   ) : undefined
@@ -1001,6 +1137,29 @@ export default function ExperimentItemsTable({
 
         {/* Peek view panel */}
         {peekConfig && <TablePeekView peekView={peekConfig} />}
+
+        {/* Run Evaluation Dialog */}
+        {showRunEvaluationDialog && (
+          <RunEvaluationDialog
+            projectId={projectId}
+            selectedObservationIds={selectedObservationIds}
+            query={batchActionQuery}
+            selectAll={selectAll}
+            totalCount={
+              selectAll
+                ? (totalCount ?? 0) * allExperimentIds.length
+                : selectedItemCount
+            }
+            onClose={() => {
+              setShowRunEvaluationDialog(false);
+              setSelectedRows({});
+              setSelectAll(false);
+            }}
+            experimentCount={allExperimentIds.length}
+            exampleObservation={exampleObservation}
+            sourceTable="experiment-items"
+          />
+        )}
       </div>
     </DataTableControlsProvider>
   );
