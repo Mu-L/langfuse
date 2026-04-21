@@ -88,6 +88,7 @@ export function TableActionMenu({
                   size="sm"
                   className={cn("h-8")}
                   title={action.label}
+                  disabled={action.disabled}
                   onClick={() => handleActionSelect(action)}
                 >
                   {action.icon || getDefaultIcon(action.type)}
