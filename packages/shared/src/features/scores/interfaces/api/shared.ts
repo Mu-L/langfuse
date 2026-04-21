@@ -76,10 +76,22 @@ export const GetScoresQuery = z.object({
 
 // POST /scores
 /**
- * PostScoresBody is copied for the ingestion API as `ScoreBody`. Please copy any changes here in `packages/shared/src/features/ingestion/types.ts`
+ * Source values accepted on the public REST create-score endpoint. EVAL is
+ * reserved for internal evaluator outputs (written via the ingestion path), so
+ * we do not expose it here.
+ *
+ * When source is ANNOTATION, a configId is required unless dataType is
+ * CORRECTION. That constraint is enforced centrally in validateAndInflateScore
+ * so it also applies to ingestion/SDK callers.
+ *
+ * PostScoresBody roughly mirrors ScoreBody in
+ * `packages/shared/src/server/ingestion/types.ts` — keep them in sync for
+ * fields that cross both surfaces.
  */
 export const PostScoresBody = applyScoreValidation(
-  PostScoreBodyFoundationSchema.and(
+  PostScoreBodyFoundationSchema.extend({
+    source: z.enum(["API", "ANNOTATION"]).default("API"),
+  }).and(
     z.discriminatedUnion("dataType", [
       z.object({
         value: z.number(),
@@ -117,6 +129,9 @@ export const PostScoresBody = applyScoreValidation(
     ]),
   ),
 ).refine(
+  // Mirrors the check in validateAndInflateScore so the REST endpoint can fail
+  // the request synchronously with 400. The ingestion/SDK path relies on the
+  // check in validateAndInflateScore, where the write is dropped async.
   (data) =>
     data.source !== "ANNOTATION" ||
     data.dataType === "CORRECTION" ||

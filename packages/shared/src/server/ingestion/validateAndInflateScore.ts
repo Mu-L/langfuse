@@ -23,6 +23,19 @@ export async function validateAndInflateScore(
 ) {
   const { body, projectId, scoreId } = params;
 
+  // Applies to both the REST create-score path and the ingestion/SDK path:
+  // ANNOTATION scores need a config to render in the annotation queue UI,
+  // except CORRECTION scores, which never carry a configId by design.
+  if (
+    body.source === "ANNOTATION" &&
+    !body.configId &&
+    body.dataType !== ScoreDataTypeEnum.CORRECTION
+  ) {
+    throw new InvalidRequestError(
+      "configId is required when source is ANNOTATION (except for CORRECTION scores).",
+    );
+  }
+
   if (body.configId) {
     const config = await prisma.scoreConfig.findFirst({
       where: {

@@ -47,8 +47,8 @@ types:
         type: optional<string>
         docs: Reference a score config on a score. The unique langfuse identifier of a score config. When passing this field, the dataType and stringValue fields are automatically populated.
       source:
-        type: optional<commons.ScoreSource>
-        docs: The source of the score. Defaults to API. Set to ANNOTATION to prefill scores (e.g. from an LLM) for a human reviewer to verify in an annotation queue. When source is ANNOTATION, a configId is required unless dataType is CORRECTION.
+        type: optional<CreateScoreSource>
+        docs: The source of the score. Defaults to API. Set to ANNOTATION to prefill scores (e.g. from an LLM) for a human reviewer to verify in an annotation queue. When source is ANNOTATION, a configId is required unless dataType is CORRECTION. EVAL is reserved for internal evaluator outputs and is not accepted on this endpoint.
     examples:
       - value:
           name: "novelty"
@@ -101,6 +101,14 @@ types:
           traceId: "cdef-1234-5678-90ab"
           source: "ANNOTATION"
           queueId: "aq-1234-5678-90ab-cdef"
+  CreateScoreSource:
+    docs: |
+      Source values accepted when creating a score via the public REST API.
+      EVAL is reserved for internal evaluator outputs and is intentionally not
+      exposed here — use commons.ScoreSource when reading scores.
+    enum:
+      - API
+      - ANNOTATION
   CreateScoreResponse:
     properties:
       id:

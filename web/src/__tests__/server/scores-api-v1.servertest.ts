@@ -1448,30 +1448,28 @@ describe("/api/public/scores API Endpoint", () => {
       });
     }, 15000);
 
-    it("accepts source=EVAL", async () => {
+    it("rejects source=EVAL (reserved for internal evaluator outputs)", async () => {
       const { projectId, auth } = await createOrgProjectAndApiKey();
       const traceId = v4();
       await createTracesCh([
         createTrace({ id: traceId, project_id: projectId }),
       ]);
 
-      const scoreId = v4();
       const response = await makeAPICall(
         "POST",
         "/api/public/scores",
-        { id: scoreId, traceId, name: "llm-judge", value: 0.8, source: "EVAL" },
+        {
+          id: v4(),
+          traceId,
+          name: "llm-judge",
+          value: 0.8,
+          source: "EVAL",
+        },
         auth,
       );
 
-      expect(response.status).toBe(200);
-
-      await waitForExpect(async () => {
-        const score = await getScoreById({ projectId, scoreId });
-        expect(score).toBeDefined();
-        expect(score!.source).toBe("EVAL");
-        expect(score!.authorUserId).toBeNull();
-      });
-    }, 15000);
+      expect(response.status).toBe(400);
+    });
 
     it("accepts source=ANNOTATION with a matching configId", async () => {
       const { projectId, auth } = await createOrgProjectAndApiKey();
@@ -1577,5 +1575,75 @@ describe("/api/public/scores API Endpoint", () => {
         500,
       );
     }, 15000);
+
+    it("drops source=ANNOTATION without a configId on the ingestion endpoint", async () => {
+      // The ingestion endpoint accepts events asynchronously, so the HTTP
+      // response is 207 regardless. The worker-side check in
+      // validateAndInflateScore must prevent the score from ever landing.
+      const { projectId, auth } = await createOrgProjectAndApiKey();
+      const traceId = v4();
+      await createTracesCh([
+        createTrace({ id: traceId, project_id: projectId }),
+      ]);
+
+      // Sentinel API-source score to confirm the worker actually processed the batch.
+      const sentinelScoreId = v4();
+      const droppedScoreId = v4();
+      const response = await makeAPICall(
+        "POST",
+        "/api/public/ingestion",
+        {
+          batch: [
+            {
+              id: v4(),
+              type: "score-create",
+              timestamp: new Date().toISOString(),
+              body: {
+                id: droppedScoreId,
+                traceId,
+                name: "helpfulness",
+                value: 0.9,
+                dataType: "NUMERIC",
+                source: "ANNOTATION",
+              },
+            },
+            {
+              id: v4(),
+              type: "score-create",
+              timestamp: new Date().toISOString(),
+              body: {
+                id: sentinelScoreId,
+                traceId,
+                name: "sentinel",
+                value: 1,
+              },
+            },
+          ],
+        },
+        auth,
+      );
+
+      expect(response.status).toBe(207);
+
+      // Wait for the sentinel to land — confirms the worker drained the batch.
+      await waitForExpect(
+        async () => {
+          const sentinel = await getScoreById({
+            projectId,
+            scoreId: sentinelScoreId,
+          });
+          expect(sentinel).toBeDefined();
+        },
+        10000,
+        500,
+      );
+
+      // The ANNOTATION-without-configId score must not have landed.
+      const dropped = await getScoreById({
+        projectId,
+        scoreId: droppedScoreId,
+      });
+      expect(dropped).toBeUndefined();
+    }, 20000);
   });
 });
