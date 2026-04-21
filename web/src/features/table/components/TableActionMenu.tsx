@@ -22,9 +22,9 @@ type TableActionMenuProps = {
 
 const getDefaultIcon = (type: TableAction["type"]) => {
   if (type === "create") {
-    return <Plus className="mr-2 h-4 w-4" />;
+    return <Plus className="h-4 w-4 sm:mr-2" />;
   }
-  return <Trash className="mr-2 h-4 w-4" />;
+  return <Trash className="h-4 w-4 sm:mr-2" />;
 };
 
 export function TableActionMenu({
@@ -57,7 +57,7 @@ export function TableActionMenu({
   return (
     <>
       <div className="pointer-events-none fixed inset-x-0 bottom-16 z-50 flex justify-center">
-        <div className="bg-background pointer-events-auto flex items-center gap-2 rounded-lg border px-3 py-2 shadow-2xl backdrop-blur-md">
+        <div className="ring-dark-blue/20 dark:border-dark-blue/30 dark:ring-dark-blue/30 bg-background pointer-events-auto flex items-center gap-2 rounded-lg border px-3 py-2 opacity-95 shadow-lg ring-2 backdrop-blur-md dark:shadow-none">
           <div className="text-sm font-medium">
             {selectedCount !== null ? (
               <span> {`${numberFormatter(selectedCount, 0)} selected`}</span>
@@ -81,10 +81,11 @@ export function TableActionMenu({
                 variant="outline"
                 size="sm"
                 className={cn("h-8")}
+                title={action.label}
                 onClick={() => handleActionSelect(action)}
               >
                 {action.icon || getDefaultIcon(action.type)}
-                <span>{action.label}</span>
+                <span className="hidden sm:inline">{action.label}</span>
               </Button>
             ))}
           </div>

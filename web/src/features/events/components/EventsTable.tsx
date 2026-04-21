@@ -550,7 +550,7 @@ export default function ObservationsEventsTable({
       label: "Evaluate",
       description: "Run evaluations on selected observations.",
       customDialog: true,
-      icon: <LightbulbIcon className="mr-2 h-4 w-4" />,
+      icon: <LightbulbIcon className="h-4 w-4 sm:mr-2" />,
       accessCheck: {
         scope: "evalJob:CUD",
       },
