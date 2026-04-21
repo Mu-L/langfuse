@@ -636,6 +636,8 @@ export default function ExperimentsTable({
                       projectId={projectId}
                       actions={tableActions}
                       tableName={BatchExportTableName.Sessions}
+                      selectedCount={selectedExperimentIds.length}
+                      onClearSelection={() => setSelectedRows({})}
                       onCustomAction={(actionId) => {
                         if (actionId === ActionId.ExperimentCompare) {
                           handleCompareSelected();

@@ -1049,6 +1049,8 @@ export default function ExperimentItemsTable({
                       projectId={projectId}
                       actions={tableActions}
                       tableName={BatchExportTableName.Sessions}
+                      selectedCount={selectedItemCount}
+                      onClearSelection={() => setSelectAll(false)}
                       onCustomAction={(actionId) => {
                         if (actionId === ActionId.ObservationBatchEvaluation) {
                           setShowRunEvaluationDialog(true);
