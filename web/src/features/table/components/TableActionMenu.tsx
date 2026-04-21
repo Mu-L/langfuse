@@ -57,7 +57,7 @@ export function TableActionMenu({
   return (
     <>
       <div className="pointer-events-none fixed inset-x-0 bottom-16 z-50 flex justify-center">
-        <div className="bg-background/95 pointer-events-auto flex items-center gap-2 rounded-lg border px-3 py-2 opacity-95 shadow-xl">
+        <div className="bg-background pointer-events-auto flex items-center gap-2 rounded-lg border px-3 py-2 shadow-2xl backdrop-blur-md">
           <div className="text-sm font-medium">
             {selectedCount !== null ? (
               <span> {`${numberFormatter(selectedCount, 0)} selected`}</span>
