@@ -491,7 +491,7 @@ interface TableBodyComponentProps<TData> {
   highlightAllRows?: boolean;
   topAlignCells?: boolean;
   cellPadding?: "compact" | "comfortable";
-
+  /** Used for React.memo comparison only */
   tableSnapshot?: {
     columnVisibility?: VisibilityState;
     columnOrder?: ColumnOrderState;
@@ -550,6 +550,7 @@ function TableBodyComponent<TData>({
   highlightAllRows,
   topAlignCells = false,
   cellPadding = "compact",
+  tableSnapshot: _tableSnapshot,
 }: TableBodyComponentProps<TData>) {
   const visibleColumns = table.getVisibleLeafColumns();
   const skeletonRowCount = Math.max(
