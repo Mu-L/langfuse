@@ -10,6 +10,11 @@ import { TableActionDialog } from "@/src/features/table/components/TableActionDi
 import { type BatchExportTableName } from "@langfuse/shared";
 import { cn } from "@/src/utils/tailwind";
 import { numberFormatter } from "@/src/utils/numbers";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/src/components/ui/tooltip";
 
 type TableActionMenuProps = {
   projectId: string;
@@ -75,19 +80,36 @@ export function TableActionMenu({
           </Button>
           <div className="bg-border h-5 w-px" />
           <div className="flex items-center gap-2">
-            {actions.map((action) => (
-              <Button
-                key={action.id}
-                variant="outline"
-                size="sm"
-                className={cn("h-8")}
-                title={action.label}
-                onClick={() => handleActionSelect(action)}
-              >
-                {action.icon || getDefaultIcon(action.type)}
-                <span className="hidden sm:inline">{action.label}</span>
-              </Button>
-            ))}
+            {actions.map((action) => {
+              const menuItem = (
+                <Button
+                  key={action.id}
+                  variant="outline"
+                  size="sm"
+                  className={cn("h-8")}
+                  title={action.label}
+                  onClick={() => handleActionSelect(action)}
+                >
+                  {action.icon || getDefaultIcon(action.type)}
+                  <span className="hidden sm:inline">{action.label}</span>
+                </Button>
+              );
+
+              if (action.disabled && action.disabledReason) {
+                return (
+                  <Tooltip key={action.id}>
+                    <TooltipTrigger asChild>
+                      <span>{menuItem}</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      {action.disabledReason}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
+
+              return menuItem;
+            })}
           </div>
         </div>
       </div>
