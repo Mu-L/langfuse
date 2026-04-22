@@ -1514,7 +1514,7 @@ describe("Clickhouse Events Repository Test", () => {
   });
 
   maybe("getTraceIdsForObservationIdsFromEventsTable", () => {
-    it("should resolve trace ids for matching span ids", async () => {
+    it("should resolve trace ids for matching span ids from the lightweight events table", async () => {
       const traceId = randomUUID();
       const syntheticId = `t-${traceId}`;
 
@@ -1548,7 +1548,7 @@ describe("Clickhouse Events Repository Test", () => {
   });
 
   maybe("checkObservationExistsInEventsTable", () => {
-    it("should respect the observations-to-trace lookback window across midnight", async () => {
+    it("should respect the observations-to-trace lookback window across midnight from the lightweight events table", async () => {
       const traceId = randomUUID();
       const syntheticId = `t-${traceId}`;
       const eventStartTime = new Date("2024-01-15T23:55:00.000Z");

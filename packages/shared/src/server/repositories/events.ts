@@ -668,7 +668,7 @@ export const getTraceIdsForObservationIdsFromEventsTable = async ({
       SELECT
         span_id as id,
         trace_id
-      FROM events_full
+      FROM events_core
       WHERE project_id = {projectId: String}
         AND span_id IN ({observationIds: Array(String)})
       ORDER BY event_ts DESC
@@ -702,7 +702,7 @@ export const checkObservationExistsInEventsTable = async ({
   const rows = await queryClickhouse<{ id: string }>({
     query: `
       SELECT span_id as id
-      FROM events_full
+      FROM events_core
       WHERE project_id = {projectId: String}
         AND span_id = {observationId: String}
         ${startTime ? `AND start_time >= {startTime: DateTime64(3)} - ${OBSERVATIONS_TO_TRACE_INTERVAL}` : ""}
