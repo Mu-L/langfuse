@@ -35,7 +35,6 @@ import { usdFormatter, latencyFormatter } from "@/src/utils/numbers";
 import { type RowSelectionState } from "@tanstack/react-table";
 import TableIdOrName from "@/src/components/table/table-id";
 import { usePeekNavigation } from "@/src/components/table/peek/hooks/usePeekNavigation";
-import { PeekViewObservationDetail } from "@/src/components/table/peek/peek-observation-detail";
 import { ExperimentGridView } from "./ExperimentGridView";
 import { useDetailPageLists } from "@/src/features/navigate-detail-pages/context";
 import { useTableViewManager } from "@/src/components/table/table-view-presets/hooks/useTableViewManager";
@@ -64,6 +63,7 @@ import { useExperimentNames } from "@/src/features/experiments/hooks/useExperime
 import { DiffLabel } from "@/src/features/datasets/components/DiffLabel";
 import { computeScoreDiffs } from "@/src/features/datasets/lib/computeScoreDiffs";
 import { useRouter } from "next/router";
+import { PeekViewExperimentItemDetail } from "@/src/components/table/peek/peek-experiment-item-detail";
 
 const renderExperimentSpecificHeader = (label: string) => (
   <span className="text-muted-foreground">{label}</span>
@@ -1144,7 +1144,7 @@ export default function ExperimentItemsTable({
             {...peekConfig}
             title={peekId ? `Experiment Item: ${peekId}` : undefined}
           >
-            <PeekViewObservationDetail projectId={projectId} />
+            <PeekViewExperimentItemDetail projectId={projectId} />
           </TablePeekView>
         )}
 

@@ -58,7 +58,7 @@ import { Badge } from "@/src/components/ui/badge";
 import { type RowSelectionState } from "@tanstack/react-table";
 import TableIdOrName from "@/src/components/table/table-id";
 import { ItemBadge } from "@/src/components/ItemBadge";
-import { PeekViewObservationDetail } from "@/src/components/table/peek/peek-observation-detail";
+import { TablePeekViewObservationDetail } from "@/src/components/table/peek/peek-observation-detail";
 import { usePeekNavigation } from "@/src/components/table/peek/hooks/usePeekNavigation";
 import { useDetailPageLists } from "@/src/features/navigate-detail-pages/context";
 import { useTableViewManager } from "@/src/components/table/table-view-presets/hooks/useTableViewManager";
@@ -68,10 +68,7 @@ import { TableSelectionManager } from "@/src/features/table/components/TableSele
 import { useSelectAll } from "@/src/features/table/hooks/useSelectAll";
 import { TableActionMenu } from "@/src/features/table/components/TableActionMenu";
 import { type TableAction } from "@/src/features/table/types";
-import {
-  type DataTablePeekViewProps,
-  TablePeekView,
-} from "@/src/components/table/peek";
+import { type DataTablePeekViewProps } from "@/src/components/table/peek";
 import { useScoreColumns } from "@/src/features/scores/hooks/useScoreColumns";
 import {
   addPrefixToScoreKeys,
@@ -182,28 +179,6 @@ export type EventsTableProps = {
   externalDateRange?: TableDateRange;
   limitRows?: number;
   sessionId?: string;
-};
-
-const TracePeekView = (
-  props: Omit<
-    React.ComponentProps<typeof TablePeekView>,
-    "children" | "title"
-  > & {
-    projectId: string;
-  },
-) => {
-  const router = useRouter();
-  const traceId =
-    typeof router.query.traceId === "string" ? router.query.traceId : undefined;
-
-  return (
-    <TablePeekView
-      {...props}
-      title={traceId ? `Trace ID: ${traceId}` : undefined}
-    >
-      <PeekViewObservationDetail projectId={props.projectId} />
-    </TablePeekView>
-  );
 };
 
 export default function ObservationsEventsTable({
@@ -1550,7 +1525,12 @@ export default function ObservationsEventsTable({
             />
           </div>
         </ResizableFilterLayout>
-        {peekConfig && <TracePeekView {...peekConfig} projectId={projectId} />}
+        {peekConfig && (
+          <TablePeekViewObservationDetail
+            {...peekConfig}
+            projectId={projectId}
+          />
+        )}
       </div>
 
       {showRunEvaluationDialog && (
