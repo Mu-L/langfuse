@@ -5,6 +5,7 @@ import {
   convertDateToClickhouseDateTime,
   flattenJsonToPathArrays,
   recordGauge,
+  TRACE_OBSERVATION_ID_PREFIX,
   type EventRecordInsertType,
 } from "@langfuse/shared/src/server";
 import { env } from "../../env";
@@ -898,7 +899,8 @@ async function processExperimentBackfill(
 
     for (const dri of driChunk) {
       // Find the root span (either observation or trace)
-      const rootSpanId = dri.observation_id || `t-${dri.trace_id}`;
+      const rootSpanId =
+        dri.observation_id || `${TRACE_OBSERVATION_ID_PREFIX}${dri.trace_id}`;
       const rootSpan = spanMap.get(rootSpanId);
 
       if (!rootSpan) {

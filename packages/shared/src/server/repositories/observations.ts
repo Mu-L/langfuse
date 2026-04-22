@@ -8,7 +8,12 @@ import {
 import { logger } from "../logger";
 import { InternalServerError, LangfuseNotFoundError } from "../../errors";
 import { prisma } from "../../db";
-import { ObservationRecordReadType } from "./definitions";
+import { isTraceObservationId, ObservationRecordReadType } from "./definitions";
+import {
+  checkObservationExistsInEventsTable,
+  getObservationByIdFromEventsTable,
+  getTraceIdsForObservationIdsFromEventsTable,
+} from "./events";
 import { FilterState } from "../../types";
 import {
   DateTimeFilter,
@@ -92,7 +97,14 @@ export const checkObservationExists = async (
     },
   });
 
-  return rows.length > 0;
+  if (rows.length > 0) return true;
+  return isTraceObservationId(id)
+    ? checkObservationExistsInEventsTable({
+        projectId,
+        observationId: id,
+        startTime,
+      })
+    : false;
 };
 
 /**
@@ -370,6 +382,17 @@ export const getObservationById = async ({
     );
   });
   if (mapped.length === 0) {
+    if (isTraceObservationId(id)) {
+      return getObservationByIdFromEventsTable({
+        id,
+        projectId,
+        fetchWithInputOutput,
+        startTime,
+        type,
+        traceId,
+        renderingProps,
+      });
+    }
     throw new LangfuseNotFoundError(`Observation with id ${id} not found`);
   }
 
@@ -382,58 +405,6 @@ export const getObservationById = async ({
     );
   }
   return mapped.shift();
-};
-
-export const getObservationsById = async (
-  ids: string[],
-  projectId: string,
-  fetchWithInputOutput: boolean = false,
-) => {
-  const query = `
-  SELECT
-    id,
-    trace_id,
-    project_id,
-    type,
-    parent_observation_id,
-    start_time,
-    end_time,
-    name,
-    metadata,
-    level,
-    status_message,
-    version,
-    ${fetchWithInputOutput ? "input, output," : ""}
-    provided_model_name,
-    internal_model_id,
-    model_parameters,
-    provided_usage_details,
-    usage_details,
-    provided_cost_details,
-    cost_details,
-    total_cost,
-    usage_pricing_tier_id,
-    usage_pricing_tier_name,
-    completion_start_time,
-    prompt_id,
-    prompt_name,
-    prompt_version,
-    tool_definitions,
-    tool_calls,
-    tool_call_names,
-    created_at,
-    updated_at,
-    event_ts
-  FROM observations
-  WHERE id IN ({ids: Array(String)})
-  AND project_id = {projectId: String}
-  ORDER BY event_ts desc
-  LIMIT 1 by id, project_id`;
-  const records = await queryClickhouse<ObservationRecordReadType>({
-    query,
-    params: { ids, projectId },
-  });
-  return records.map((record) => convertObservation(record));
 };
 
 const getObservationByIdInternal = async ({
@@ -1522,49 +1493,6 @@ export const getObservationMetricsForPrompts = async (
   }));
 };
 
-export const getLatencyAndTotalCostForObservations = async (
-  projectId: string,
-  observationIds: string[],
-  timestamp?: Date,
-) => {
-  const query = `
-    SELECT
-        id,
-        cost_details['total'] AS total_cost,
-        dateDiff('millisecond', start_time, end_time) AS latency_ms
-    FROM observations FINAL
-    WHERE project_id = {projectId: String}
-    AND id IN ({observationIds: Array(String)})
-    ${timestamp ? `AND start_time >= {timestamp: DateTime64(3)}` : ""}
-`;
-  const rows = await queryClickhouse<{
-    id: string;
-    total_cost: string;
-    latency_ms: string;
-  }>({
-    query: query,
-    params: {
-      projectId,
-      observationIds,
-      ...(timestamp
-        ? { timestamp: convertDateToClickhouseDateTime(timestamp) }
-        : {}),
-    },
-    tags: {
-      feature: "tracing",
-      type: "observation",
-      kind: "analytic",
-      projectId,
-    },
-  });
-
-  return rows.map((r) => ({
-    id: r.id,
-    totalCost: Number(r.total_cost),
-    latency: Number(r.latency_ms) / 1000,
-  }));
-};
-
 export const getLatencyAndTotalCostForObservationsByTraces = async (
   projectId: string,
   traceIds: string[],
@@ -1773,10 +1701,20 @@ export const getTraceIdsForObservations = async (
     },
   });
 
-  return rows.map((row) => ({
-    id: row.id,
-    traceId: row.trace_id,
-  }));
+  const found = new Set(rows.map((r) => r.id));
+  const missingSyntheticIds = observationIds.filter(
+    (id) => !found.has(id) && isTraceObservationId(id),
+  );
+
+  const syntheticFallbacks = await getTraceIdsForObservationIdsFromEventsTable({
+    projectId,
+    observationIds: missingSyntheticIds,
+  });
+
+  return [
+    ...rows.map((row) => ({ id: row.id, traceId: row.trace_id })),
+    ...syntheticFallbacks,
+  ];
 };
 
 export const getObservationsForBlobStorageExport = function (

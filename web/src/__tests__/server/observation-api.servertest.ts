@@ -475,4 +475,119 @@ describe("/api/public/observations API Endpoint", () => {
     runTestSuite(true); // with events table
   }
   runTestSuite(false); // with observations table
+
+  describe("trace-observation id (`t-<traceId>`)", () => {
+    it("resolves a t-prefixed id via the events reader even when the classic path is selected", async () => {
+      const traceId = uuidv4();
+      const syntheticId = `t-${traceId}`;
+
+      const trace = createTrace({
+        id: traceId,
+        project_id: projectId,
+        name: "lfe-9379-trace",
+      });
+      const syntheticSpan = createEvent({
+        id: syntheticId,
+        span_id: syntheticId,
+        project_id: projectId,
+        trace_id: traceId,
+        type: "SPAN",
+        name: "lfe-9379-trace",
+        parent_span_id: null,
+        input: "trace-input",
+        output: "trace-output",
+        provided_model_name: null,
+        model_id: null,
+      });
+
+      await createTracesCh([trace]);
+      await createEventsCh([syntheticSpan]);
+
+      // useEventsTable=false: classic path must delegate and return the synthetic span.
+      const classicRes = await makeZodVerifiedAPICall(
+        GetObservationV1Response,
+        "GET",
+        `/api/public/observations/${syntheticId}?useEventsTable=false`,
+      );
+      expect(classicRes.status).toBe(200);
+      expect(classicRes.body).toMatchObject({
+        id: syntheticId,
+        traceId,
+        type: "SPAN",
+      });
+
+      // useEventsTable=true: explicit events-table routing continues to work.
+      const eventsRes = await makeZodVerifiedAPICall(
+        GetObservationV1Response,
+        "GET",
+        `/api/public/observations/${syntheticId}?useEventsTable=true`,
+      );
+      expect(eventsRes.status).toBe(200);
+      expect(eventsRes.body).toMatchObject({
+        id: syntheticId,
+        traceId,
+        type: "SPAN",
+      });
+
+      // No query param: default (env flag) must still succeed because the
+      // delegation lives below the endpoint-level routing.
+      const defaultRes = await makeZodVerifiedAPICall(
+        GetObservationV1Response,
+        "GET",
+        `/api/public/observations/${syntheticId}`,
+      );
+      expect(defaultRes.status).toBe(200);
+      expect(defaultRes.body).toMatchObject({
+        id: syntheticId,
+        traceId,
+        type: "SPAN",
+      });
+    });
+
+    it("returns 404 when the synthetic span does not exist", async () => {
+      const missingId = `t-${uuidv4()}`;
+      await expect(
+        makeZodVerifiedAPICall(
+          GetObservationV1Response,
+          "GET",
+          `/api/public/observations/${missingId}?useEventsTable=false`,
+        ),
+      ).rejects.toThrow();
+    });
+
+    it("prefers the real observation when a user-ingested span id starts with `t-`", async () => {
+      // Users can ingest real spans whose id happens to start with `t-` (see
+      // `idSchema` in `packages/shared/src/server/ingestion/types.ts`). The
+      // classic-path reader must return that real row, not silently route to
+      // the synthetic trace-as-span fallback.
+      const traceId = uuidv4();
+      const realObservationId = `t-custom-${uuidv4()}`;
+
+      const realObservation = createObservation({
+        id: realObservationId,
+        project_id: projectId,
+        trace_id: traceId,
+        type: "SPAN",
+        name: "user-span-with-t-prefix",
+        input: "real-input",
+        output: "real-output",
+      });
+      await createObservationsCh([realObservation]);
+
+      const res = await makeZodVerifiedAPICall(
+        GetObservationV1Response,
+        "GET",
+        `/api/public/observations/${realObservationId}?useEventsTable=false`,
+      );
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        id: realObservationId,
+        traceId,
+        type: "SPAN",
+        name: "user-span-with-t-prefix",
+        input: "real-input",
+        output: "real-output",
+      });
+    });
+  });
 });

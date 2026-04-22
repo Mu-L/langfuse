@@ -4,6 +4,7 @@ import {
   convertDateToClickhouseDateTime,
   logger,
   queryClickhouse,
+  TRACE_OBSERVATION_ID_PREFIX,
 } from "@langfuse/shared/src/server";
 import { prisma } from "@langfuse/shared/src/db";
 import { env } from "../env";
@@ -480,7 +481,8 @@ export default class BackfillExperimentsHistoric implements IBackgroundMigration
       let skippedCount = 0;
 
       for (const dri of dris) {
-        const rootSpanId = dri.observation_id || `t-${dri.trace_id}`;
+        const rootSpanId =
+          dri.observation_id || `${TRACE_OBSERVATION_ID_PREFIX}${dri.trace_id}`;
         const rootSpan = spanMap.get(rootSpanId);
 
         if (!rootSpan) {

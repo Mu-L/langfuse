@@ -3,7 +3,9 @@ import {
   createEventsCh,
   getObservationsWithModelDataFromEventsTable,
   getObservationsCountFromEventsTable,
+  checkObservationExistsInEventsTable,
   getObservationByIdFromEventsTable,
+  getTraceIdsForObservationIdsFromEventsTable,
   getObservationsFromEventsTableForPublicApi,
   getObservationsCountFromEventsTableForPublicApi,
   updateEvents,
@@ -1508,6 +1510,70 @@ describe("Clickhouse Events Repository Test", () => {
           startTime: wrongDate,
         }),
       ).rejects.toThrow();
+    });
+  });
+
+  maybe("getTraceIdsForObservationIdsFromEventsTable", () => {
+    it("should resolve trace ids for matching span ids", async () => {
+      const traceId = randomUUID();
+      const syntheticId = `t-${traceId}`;
+
+      await createEventsCh([
+        createEvent({
+          id: syntheticId,
+          span_id: syntheticId,
+          project_id: projectId,
+          trace_id: traceId,
+          type: "SPAN",
+          name: "synthetic-root-span",
+        }),
+      ]);
+
+      const result = await getTraceIdsForObservationIdsFromEventsTable({
+        projectId,
+        observationIds: [syntheticId],
+      });
+
+      expect(result).toEqual([{ id: syntheticId, traceId }]);
+    });
+
+    it("should return an empty array for missing span ids", async () => {
+      const result = await getTraceIdsForObservationIdsFromEventsTable({
+        projectId,
+        observationIds: [`t-${randomUUID()}`],
+      });
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  maybe("checkObservationExistsInEventsTable", () => {
+    it("should respect the observations-to-trace lookback window across midnight", async () => {
+      const traceId = randomUUID();
+      const syntheticId = `t-${traceId}`;
+      const eventStartTime = new Date("2024-01-15T23:55:00.000Z");
+      const lookupTime = new Date("2024-01-16T00:05:00.000Z");
+
+      await createEventsCh([
+        createEvent({
+          id: syntheticId,
+          span_id: syntheticId,
+          project_id: projectId,
+          trace_id: traceId,
+          type: "SPAN",
+          name: "synthetic-root-span",
+          start_time: eventStartTime.getTime() * 1000,
+          event_ts: eventStartTime.getTime() * 1000,
+        }),
+      ]);
+
+      const exists = await checkObservationExistsInEventsTable({
+        projectId,
+        observationId: syntheticId,
+        startTime: lookupTime,
+      });
+
+      expect(exists).toBe(true);
     });
   });
 

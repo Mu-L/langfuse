@@ -1,6 +1,17 @@
 import z from "zod";
 import { DEFAULT_TRACE_ENVIRONMENT } from "../ingestion/types";
 
+/**
+ * Prefix the ingestion pipeline adds to a trace id when representing the trace
+ * as a synthetic SPAN observation in the events pipeline (see
+ * `convertTraceToStagingObservation`). Read-side lookups of `t-<traceId>` must
+ * resolve against the events table, not the classic observations table.
+ */
+export const TRACE_OBSERVATION_ID_PREFIX = "t-" as const;
+
+export const isTraceObservationId = (id: string): boolean =>
+  id.startsWith(TRACE_OBSERVATION_ID_PREFIX);
+
 export const clickhouseStringDateSchema = z
   .string()
   // clickhouse stores UTC like '2024-05-23 18:33:41.602000'
@@ -385,7 +396,7 @@ export const convertTraceToStagingObservation = (
 ): ObservationBatchStagingRecordInsertType => {
   return {
     // Identity - trace acts as its own span. Modify traceId to avoid cases where users set spanId = traceId.
-    id: `t-${traceRecord.id}`,
+    id: `${TRACE_OBSERVATION_ID_PREFIX}${traceRecord.id}`,
     trace_id: traceRecord.id,
     project_id: traceRecord.project_id,
 

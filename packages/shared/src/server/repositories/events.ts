@@ -75,6 +75,7 @@ import { UiColumnMappings } from "../../tableDefinitions";
 import { eventsTableCols } from "../../eventsTable";
 import { tracesTableCols } from "../../tableDefinitions/tracesTable";
 import { parseMetadataCHRecordToDomain } from "../utils/metadata_conversion";
+import { OBSERVATIONS_TO_TRACE_INTERVAL } from "./constants";
 
 type ObservationsTableQueryResultWitouhtTraceFields = Omit<
   ObservationsTableQueryResult,
@@ -649,6 +650,82 @@ export const getObservationByIdFromEventsTable = async ({
     );
   }
   return mapped.shift();
+};
+
+export const getTraceIdsForObservationIdsFromEventsTable = async ({
+  projectId,
+  observationIds,
+}: {
+  projectId: string;
+  observationIds: string[];
+}): Promise<Array<{ id: string; traceId: string }>> => {
+  if (observationIds.length === 0) {
+    return [];
+  }
+
+  const rows = await queryClickhouse<{ id: string; trace_id: string }>({
+    query: `
+      SELECT
+        span_id as id,
+        trace_id
+      FROM events_full
+      WHERE project_id = {projectId: String}
+        AND span_id IN ({observationIds: Array(String)})
+      ORDER BY event_ts DESC
+      LIMIT 1 BY id
+    `,
+    params: {
+      projectId,
+      observationIds,
+    },
+    tags: {
+      feature: "tracing",
+      type: "events",
+      kind: "list",
+      projectId,
+    },
+    preferredClickhouseService: "EventsReadOnly",
+  });
+
+  return rows.map((row) => ({ id: row.id, traceId: row.trace_id }));
+};
+
+export const checkObservationExistsInEventsTable = async ({
+  projectId,
+  observationId,
+  startTime,
+}: {
+  projectId: string;
+  observationId: string;
+  startTime?: Date;
+}): Promise<boolean> => {
+  const rows = await queryClickhouse<{ id: string }>({
+    query: `
+      SELECT span_id as id
+      FROM events_full
+      WHERE project_id = {projectId: String}
+        AND span_id = {observationId: String}
+        ${startTime ? `AND start_time >= {startTime: DateTime64(3)} - ${OBSERVATIONS_TO_TRACE_INTERVAL}` : ""}
+      ORDER BY event_ts DESC
+      LIMIT 1 BY id
+    `,
+    params: {
+      projectId,
+      observationId,
+      ...(startTime
+        ? { startTime: convertDateToClickhouseDateTime(startTime) }
+        : {}),
+    },
+    tags: {
+      feature: "tracing",
+      type: "events",
+      kind: "exists",
+      projectId,
+    },
+    preferredClickhouseService: "EventsReadOnly",
+  });
+
+  return rows.length > 0;
 };
 
 async function getObservationByIdFromEventsTableInternal({
