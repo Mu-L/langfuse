@@ -36,8 +36,12 @@ export const TablePeekViewTraceDetail = (
 
   const router = useRouter();
   const peekId = router.query.peek as string | undefined;
-  const timestamp = router.query.timestamp
-    ? new Date(router.query.timestamp as string)
+  const timestampParam = router.query.timestamp as string | undefined;
+
+  // Decode the timestamp parameter before parsing as Date
+  // This handles cases where the timestamp might be URL-encoded
+  const timestamp = timestampParam
+    ? new Date(decodeURIComponent(timestampParam))
     : undefined;
 
   const trace = usePeekData({
