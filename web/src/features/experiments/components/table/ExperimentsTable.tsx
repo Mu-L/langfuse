@@ -616,18 +616,6 @@ export default function ExperimentsTable({
             setRowHeight={setRowHeight}
             timeRange={timeRange}
             setTimeRange={setTimeRange}
-            multiSelect={{
-              selectAll: false,
-              setSelectAll: () => {},
-              totalCount,
-              selectedRowIds:
-                Object.keys(selectedRows).filter((experimentId) =>
-                  experiments.rows?.map((e) => e.id).includes(experimentId),
-                ) ?? [],
-              setRowSelection: setSelectedRows,
-              pageSize: paginationState.limit,
-              pageIndex: paginationState.page - 1,
-            }}
             actionButtons={
               shouldShowActions
                 ? [

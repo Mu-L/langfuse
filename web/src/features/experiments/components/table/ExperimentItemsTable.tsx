@@ -1102,6 +1102,7 @@ export default function ExperimentItemsTable({
                   }
                   rowSelection={selectedRows}
                   setRowSelection={setSelectedRows}
+                  highlightAllRows={selectAll}
                 />
               ) : (
                 <div className="flex flex-1 items-center justify-center">
@@ -1135,6 +1136,7 @@ export default function ExperimentItemsTable({
                     </span>
                   ) : undefined
                 }
+                highlightAllRows={selectAll}
               />
             )}
           </div>
